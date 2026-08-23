@@ -21,7 +21,8 @@
 <script>
   (function(){try{var t=localStorage.getItem('vk-theme');
   if(!t)t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
-  document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+  document.documentElement.setAttribute('data-theme',t);}catch(e){}
+  document.documentElement.classList.add('js');})();
 </script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Person","name":"Vishal Kumar","jobTitle":"Full Stack Developer",
@@ -357,7 +358,7 @@
         <h2>Let's build something</h2>
         <p style="margin-top:16px;max-width:50ch">Tell me what you are building and what you need. Every message lands straight in my inbox and I reply to serious enquiries within one working day.</p>
 
-        <form class="form-grid" id="contact-form" style="margin-top:26px" novalidate>
+        <form class="form-grid" id="contact-form" style="margin-top:26px" action="/api/contact" method="post" novalidate>
           <div class="field">
             <label for="f-name">Your name</label>
             <input id="f-name" name="name" type="text" autocomplete="name" maxlength="120" required>

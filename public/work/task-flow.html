@@ -19,7 +19,8 @@
 <script>
   (function(){try{var t=localStorage.getItem('vk-theme');
   if(!t)t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
-  document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+  document.documentElement.setAttribute('data-theme',t);}catch(e){}
+  document.documentElement.classList.add('js');})();
 </script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"CreativeWork","name":"Task-Flow","author":{"@type":"Person","name":"Vishal Kumar"},"description":"A complete multi-tenant SaaS: tenant-isolated workspaces, Stripe subscription billing, real-time Kanban and a Redis-backed job queue.","url":"https://mellow-pebble-31.s1.seeiousercontent.com/work/task-flow.html"}</script>
 </head>

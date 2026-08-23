@@ -179,7 +179,7 @@
       submit.disabled = true;
       submit.textContent = 'Sending…';
 
-      fetch('/api/contact', { method: 'POST', body: new FormData(form) })
+      fetch('/api/contact', { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'fetch' } })
         .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
         .then(function (res) {
           if (res.ok && res.data.ok) {

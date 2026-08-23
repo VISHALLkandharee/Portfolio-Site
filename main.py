@@ -202,10 +202,34 @@ async def contact(
     subject: str = Form(""),
     message: str = Form(""),
     website: str = Form(""),  # honeypot: real people leave it empty
-) -> JSONResponse:
+) -> Response:
+    wants_json = request.headers.get("x-requested-with", "").lower() == "fetch"
+
+    def reply(payload: dict, status_code: int = 200) -> Response:
+        """JSON for the fetch path, a readable page when JavaScript is off."""
+        if wants_json:
+            return JSONResponse(payload, status_code=status_code)
+        if payload.get("ok"):
+            return RedirectResponse("/thanks.html", status_code=303)
+        problems = list((payload.get("errors") or {}).values())
+        if not problems and payload.get("error"):
+            problems = [payload["error"]]
+        detail = "".join(f"<li>{html.escape(p)}</li>" for p in problems)
+        body = (
+            '<div class="inbox"><h1 style="font-size:1.8rem">That did not go through</h1>'
+            f'<ul style="margin:18px 0;color:var(--muted)">{detail}</ul>'
+            '<p class="note">Go back and try again, or email '
+            '<a href="mailto:vishall.kandharee@gmail.com" style="color:var(--accent)">'
+            'vishall.kandharee@gmail.com</a> directly.</p>'
+            '<p style="margin-top:22px"><a class="btn btn-ghost" href="/#contact">Back to the form</a></p></div>'
+        )
+        response = page("Message not sent", body)
+        response.status_code = status_code
+        return response
+
     if website.strip():
         # Silently accept and drop: bots get a 200, the inbox stays clean.
-        return JSONResponse({"ok": True})
+        return reply({"ok": True})
 
     name = name.strip()[:MAX_NAME]
     email = email.strip()[:MAX_EMAIL]
@@ -220,7 +244,7 @@ async def contact(
     if len(message) < 10:
         errors["message"] = "A sentence or two about the project, please."
     if errors:
-        return JSONResponse({"ok": False, "errors": errors}, status_code=422)
+        return reply({"ok": False, "errors": errors}, status_code=422)
 
     ip_hash, rate_max = client_ip_hash(request)
     cutoff = int(time.time()) - RATE_LIMIT_WINDOW
@@ -231,7 +255,7 @@ async def contact(
             (ip_hash, str(cutoff)),
         ).fetchone()
         if recent >= rate_max:
-            return JSONResponse(
+            return reply(
                 {"ok": False, "error": "Too many messages just now. Please email me directly."},
                 status_code=429,
             )
@@ -239,7 +263,7 @@ async def contact(
             "INSERT INTO messages (name, email, subject, body, ip_hash) VALUES (?, ?, ?, ?, ?)",
             (name, email, subject, message, ip_hash),
         )
-    return JSONResponse({"ok": True})
+    return reply({"ok": True})
 
 
 # --------------------------------------------------------------------------

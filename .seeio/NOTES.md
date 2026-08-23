@@ -20,6 +20,8 @@ plus a working contact form. Homepage + three project case studies + 404.
 - Contact form POSTs to /api/contact, stored in SQLite at /data/app.db (created on first boot, /data is the only persistent path).
 - Owner inbox at /inbox. FIRST VISIT SETS THE PASSWORD, so the owner must claim it right after the first deploy.
   Session is an HMAC-signed cookie; the signing key lives at /data/session.key. Password stored as PBKDF2-SHA256 (200k rounds).
+- Contact form works without JavaScript too: the form posts normally, the server redirects to /thanks.html on success
+  and renders a readable error page on failure. With JS it submits through fetch (X-Requested-With: fetch) and stays in place.
 - Spam handling: hidden honeypot field, server-side validation, per-IP rate limit (8/hour when X-Forwarded-For identifies
   the visitor, 60/hour shared fallback when it does not).
 - /inbox is disallowed in robots.txt and marked noindex.
@@ -31,6 +33,7 @@ plus a working contact form. Homepage + three project case studies + 404.
   All motion is disabled under prefers-reduced-motion.
 - Case study copy is grounded in the resume bullets and repo descriptions. No invented metrics.
 - No em dashes anywhere in visitor-facing copy.
+- Reveal animations only apply when JS is present (`html.js` class), so content is never hidden if a script fails.
 - Cache busting: /style.css?v=3 and /app.js?v=3. BUMP THE VERSION on every CSS/JS change, in every page that links them
   (index, 404, three case studies, and the inline inbox template in main.py).
 
