@@ -1,0 +1,219 @@
+/* Vishal Kumar portfolio, v3 */
+(function () {
+  'use strict';
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- theme ---------- */
+  var themeBtn = document.querySelector('.theme-toggle');
+  function paintTheme() {
+    var t = document.documentElement.getAttribute('data-theme') || 'dark';
+    if (themeBtn) {
+      themeBtn.textContent = t === 'light' ? '☾' : '☀';
+      themeBtn.setAttribute('aria-label', t === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
+    }
+  }
+  paintTheme();
+  if (themeBtn) {
+    themeBtn.addEventListener('click', function () {
+      var next = (document.documentElement.getAttribute('data-theme') === 'light') ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('vk-theme', next); } catch (e) {}
+      paintTheme();
+    });
+  }
+
+  /* ---------- mobile nav ---------- */
+  var toggle = document.querySelector('.nav-toggle');
+  var nav = document.getElementById('nav');
+  if (toggle && nav) {
+    toggle.addEventListener('click', function () {
+      var open = nav.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.textContent = open ? '✕' : '☰';
+    });
+    nav.addEventListener('click', function (e) {
+      if (e.target.tagName === 'A') {
+        nav.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.textContent = '☰';
+      }
+    });
+  }
+
+  /* ---------- scroll progress ---------- */
+  var bar = document.querySelector('.progress');
+  if (bar) {
+    var tick = function () {
+      var h = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
+    };
+    window.addEventListener('scroll', tick, { passive: true });
+    window.addEventListener('resize', tick);
+    tick();
+  }
+
+  /* ---------- reveal on scroll ---------- */
+  var revealables = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window) || reduced) {
+    Array.prototype.forEach.call(revealables, function (el) { el.classList.add('in'); });
+  } else {
+    var ro = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in');
+          ro.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+    Array.prototype.forEach.call(revealables, function (el, i) {
+      el.style.transitionDelay = Math.min(i % 4, 3) * 70 + 'ms';
+      ro.observe(el);
+    });
+  }
+
+  /* ---------- active nav link ---------- */
+  var links = Array.prototype.slice.call(document.querySelectorAll('.nav a[href^="#"]'));
+  var sections = links.map(function (a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+  if ('IntersectionObserver' in window && sections.length) {
+    var so = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        links.forEach(function (a) {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + entry.target.id);
+        });
+      });
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    sections.forEach(function (s) { so.observe(s); });
+  }
+
+  /* ---------- typed role line ---------- */
+  var typed = document.querySelector('.typed');
+  if (typed) {
+    var phrases = (typed.getAttribute('data-phrases') || '').split('|').filter(Boolean);
+    var out = typed.querySelector('.out');
+    if (phrases.length && out) {
+      if (reduced) {
+        out.textContent = phrases[0];
+      } else {
+        var pi = 0, ci = 0, deleting = false;
+        var run = function () {
+          var word = phrases[pi];
+          out.textContent = word.slice(0, ci);
+          if (!deleting && ci < word.length) { ci++; setTimeout(run, 55); }
+          else if (!deleting) { deleting = true; setTimeout(run, 1900); }
+          else if (ci > 0) { ci--; setTimeout(run, 26); }
+          else { deleting = false; pi = (pi + 1) % phrases.length; setTimeout(run, 300); }
+        };
+        run();
+      }
+    }
+  }
+
+  /* ---------- count up stats ---------- */
+  var counters = document.querySelectorAll('[data-count]');
+  if (counters.length && 'IntersectionObserver' in window && !reduced) {
+    var co = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        var el = entry.target;
+        co.unobserve(el);
+        var target = parseFloat(el.getAttribute('data-count'));
+        var suffix = el.getAttribute('data-suffix') || '';
+        var decimals = (String(target).split('.')[1] || '').length;
+        var start = null, dur = 1200;
+        var step = function (ts) {
+          if (!start) start = ts;
+          var p = Math.min((ts - start) / dur, 1);
+          var eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = (target * eased).toFixed(decimals) + suffix;
+          if (p < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      });
+    }, { threshold: 0.4 });
+    Array.prototype.forEach.call(counters, function (el) { co.observe(el); });
+  }
+
+  /* ---------- pointer glow on project cards ---------- */
+  if (!reduced && window.matchMedia('(hover: hover)').matches) {
+    Array.prototype.forEach.call(document.querySelectorAll('.project'), function (card) {
+      card.addEventListener('mousemove', function (e) {
+        var r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', ((e.clientX - r.left) / r.width) * 100 + '%');
+        card.style.setProperty('--my', ((e.clientY - r.top) / r.height) * 100 + '%');
+      });
+    });
+  }
+
+  /* ---------- copy to clipboard ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll('[data-copy]'), function (btn) {
+    btn.addEventListener('click', function () {
+      var value = btn.getAttribute('data-copy');
+      var done = function () {
+        var old = btn.textContent;
+        btn.textContent = 'copied';
+        setTimeout(function () { btn.textContent = old; }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(done, function () {});
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = value; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    });
+  });
+
+  /* ---------- contact form ---------- */
+  var form = document.getElementById('contact-form');
+  if (form) {
+    var status = document.getElementById('form-status');
+    var submit = form.querySelector('button[type="submit"]');
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      Array.prototype.forEach.call(form.querySelectorAll('.field'), function (f) { f.classList.remove('invalid'); });
+      status.className = 'form-status';
+      status.textContent = '';
+      var label = submit.textContent;
+      submit.disabled = true;
+      submit.textContent = 'Sending…';
+
+      fetch('/api/contact', { method: 'POST', body: new FormData(form) })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (res) {
+          if (res.ok && res.data.ok) {
+            form.reset();
+            status.className = 'form-status ok';
+            status.textContent = 'Thank you, your message reached me. I reply to every serious enquiry, usually within one working day.';
+          } else if (res.data && res.data.errors) {
+            Object.keys(res.data.errors).forEach(function (key) {
+              var field = form.querySelector('[name="' + key + '"]');
+              if (field && field.closest('.field')) {
+                field.closest('.field').classList.add('invalid');
+                var err = field.closest('.field').querySelector('.err');
+                if (err) err.textContent = res.data.errors[key];
+              }
+            });
+            status.className = 'form-status bad';
+            status.textContent = 'Please check the highlighted fields.';
+          } else {
+            status.className = 'form-status bad';
+            status.textContent = (res.data && res.data.error) || 'Something went wrong. Please email vishall.kandharee@gmail.com directly.';
+          }
+        })
+        .catch(function () {
+          status.className = 'form-status bad';
+          status.textContent = 'Network error. Please email vishall.kandharee@gmail.com directly.';
+        })
+        .then(function () {
+          submit.disabled = false;
+          submit.textContent = label;
+        });
+    });
+  }
+
+  /* ---------- year ---------- */
+  var year = document.getElementById('year');
+  if (year) year.textContent = new Date().getFullYear();
+})();

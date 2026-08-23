@@ -1,0 +1,394 @@
+"""Vishal Kumar portfolio.
+
+Static site served by FastAPI, plus a working contact form.
+
+see.io contract notes:
+  * /data is the ONLY path that survives deploys and rollbacks;
+  * builds and build sandboxes see /data empty or absent, so everything
+    stateful is created on first boot;
+  * nothing stateful is written anywhere else.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import html
+import os
+import re
+import secrets
+import sqlite3
+import time
+from contextlib import asynccontextmanager, closing
+from pathlib import Path
+
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+)
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
+
+BASE_DIR = Path(__file__).resolve().parent
+PUBLIC_DIR = BASE_DIR / "public"
+
+DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
+DB_PATH = DATA_DIR / "app.db"
+SECRET_PATH = DATA_DIR / "session.key"
+
+SESSION_COOKIE = "vk_inbox"
+SESSION_TTL = 60 * 60 * 12  # 12 hours
+
+MAX_NAME = 120
+MAX_EMAIL = 160
+MAX_SUBJECT = 160
+MAX_MESSAGE = 4000
+RATE_LIMIT_WINDOW = 3600
+RATE_LIMIT_MAX = 8          # per visitor IP, when the proxy identifies it
+RATE_LIMIT_MAX_SHARED = 60  # fallback when every request looks like one IP
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s.]+\.[^@\s]+$")
+
+
+# --------------------------------------------------------------------------
+# storage
+# --------------------------------------------------------------------------
+def connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
+
+def init_db() -> None:
+    """First-boot initialization: /data may be empty or absent here."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with closing(connect()) as conn, conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS messages (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                name     TEXT NOT NULL,
+                email    TEXT NOT NULL,
+                subject  TEXT NOT NULL DEFAULT '',
+                body     TEXT NOT NULL,
+                ip_hash  TEXT NOT NULL DEFAULT '',
+                read     INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
+    if not SECRET_PATH.exists():
+        SECRET_PATH.write_text(secrets.token_hex(32), encoding="utf-8")
+
+
+def session_secret() -> bytes:
+    if not SECRET_PATH.exists():
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        SECRET_PATH.write_text(secrets.token_hex(32), encoding="utf-8")
+    return SECRET_PATH.read_text(encoding="utf-8").strip().encode()
+
+
+def get_setting(key: str) -> str | None:
+    with closing(connect()) as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def set_setting(key: str, value: str) -> None:
+    with closing(connect()) as conn, conn:
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
+
+
+# --------------------------------------------------------------------------
+# owner auth for /inbox
+# --------------------------------------------------------------------------
+def hash_password(password: str, salt: str | None = None) -> str:
+    salt = salt or secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 200_000)
+    return f"{salt}${digest.hex()}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        salt, _ = stored.split("$", 1)
+    except ValueError:
+        return False
+    return hmac.compare_digest(hash_password(password, salt), stored)
+
+
+def make_session() -> str:
+    expires = str(int(time.time()) + SESSION_TTL)
+    sig = hmac.new(session_secret(), expires.encode(), hashlib.sha256).hexdigest()
+    return f"{expires}.{sig}"
+
+
+def valid_session(token: str | None) -> bool:
+    if not token or "." not in token:
+        return False
+    expires, sig = token.rsplit(".", 1)
+    expected = hmac.new(session_secret(), expires.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return False
+    try:
+        return int(expires) > time.time()
+    except ValueError:
+        return False
+
+
+def client_ip_hash(request: Request) -> tuple[str, int]:
+    """Identify the sender, and say how strict the rate limit may be.
+
+    Behind the platform proxy every request can carry the same source
+    address. If nothing distinguishes visitors, a tight per-IP limit would
+    lock out real people, so the cap loosens instead.
+    """
+    fwd = request.headers.get("x-forwarded-for", "")
+    if fwd.strip():
+        ip, limit = fwd.split(",")[0].strip(), RATE_LIMIT_MAX
+    else:
+        ip, limit = (request.client.host if request.client else ""), RATE_LIMIT_MAX_SHARED
+    return hashlib.sha256((ip + "vk-portfolio").encode()).hexdigest()[:32], limit
+
+
+# --------------------------------------------------------------------------
+# app
+# --------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # noqa: ANN201 - FastAPI lifespan signature
+    init_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+app.add_middleware(GZipMiddleware, minimum_size=800)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):  # noqa: ANN001
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return response
+
+
+@app.get("/healthz")
+def healthz() -> dict[str, bool]:
+    return {"ok": True}
+
+
+@app.post("/api/contact")
+async def contact(
+    request: Request,
+    name: str = Form(""),
+    email: str = Form(""),
+    subject: str = Form(""),
+    message: str = Form(""),
+    website: str = Form(""),  # honeypot: real people leave it empty
+) -> JSONResponse:
+    if website.strip():
+        # Silently accept and drop: bots get a 200, the inbox stays clean.
+        return JSONResponse({"ok": True})
+
+    name = name.strip()[:MAX_NAME]
+    email = email.strip()[:MAX_EMAIL]
+    subject = subject.strip()[:MAX_SUBJECT]
+    message = message.strip()[:MAX_MESSAGE]
+
+    errors: dict[str, str] = {}
+    if len(name) < 2:
+        errors["name"] = "Please tell me your name."
+    if not EMAIL_RE.match(email):
+        errors["email"] = "That email address does not look right."
+    if len(message) < 10:
+        errors["message"] = "A sentence or two about the project, please."
+    if errors:
+        return JSONResponse({"ok": False, "errors": errors}, status_code=422)
+
+    ip_hash, rate_max = client_ip_hash(request)
+    cutoff = int(time.time()) - RATE_LIMIT_WINDOW
+    with closing(connect()) as conn, conn:
+        (recent,) = conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE ip_hash = ? "
+            "AND strftime('%s', ts) > ?",
+            (ip_hash, str(cutoff)),
+        ).fetchone()
+        if recent >= rate_max:
+            return JSONResponse(
+                {"ok": False, "error": "Too many messages just now. Please email me directly."},
+                status_code=429,
+            )
+        conn.execute(
+            "INSERT INTO messages (name, email, subject, body, ip_hash) VALUES (?, ?, ?, ?, ?)",
+            (name, email, subject, message, ip_hash),
+        )
+    return JSONResponse({"ok": True})
+
+
+# --------------------------------------------------------------------------
+# owner inbox
+# --------------------------------------------------------------------------
+def page(title: str, body: str) -> HTMLResponse:
+    return HTMLResponse(
+        f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>{html.escape(title)}</title>
+<link rel="stylesheet" href="/style.css?v=3">
+<style>
+ body{{padding:40px 0}}
+ .inbox{{max-width:860px;margin:0 auto;padding:0 24px}}
+ .inbox form{{display:grid;gap:14px;max-width:420px;margin-top:22px}}
+ .inbox input{{padding:13px 15px;border-radius:12px;border:1px solid var(--line);
+   background:var(--surface);color:var(--text);font:inherit}}
+ .msg{{border:1px solid var(--line);border-radius:14px;padding:20px;margin-top:16px;background:var(--surface)}}
+ .msg.unread{{border-color:var(--accent)}}
+ .msg h3{{font-size:1.05rem;margin-bottom:4px}}
+ .msg .meta{{font-size:.82rem;color:var(--muted);margin-bottom:12px}}
+ .msg p.body{{white-space:pre-wrap;color:var(--text);font-size:.96rem}}
+ .msg .row{{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}}
+ .note{{color:var(--muted);font-size:.9rem;margin-top:10px}}
+</style></head><body>{body}</body></html>"""
+    )
+
+
+@app.get("/inbox", response_class=HTMLResponse)
+def inbox(request: Request) -> HTMLResponse:
+    stored = get_setting("owner_password")
+    if not stored:
+        return page(
+            "Set up inbox",
+            """<div class="inbox">
+<h1 style="font-size:1.9rem">Set your inbox password</h1>
+<p class="note">This is the first visit to the inbox, so choose the password now.
+Contact form messages are kept here.</p>
+<form method="post" action="/inbox/setup">
+  <input type="password" name="password" placeholder="New password (10 characters or more)" minlength="10" required>
+  <input type="password" name="confirm" placeholder="Repeat the password" minlength="10" required>
+  <button class="btn btn-primary" type="submit">Save password</button>
+</form></div>""",
+        )
+    if not valid_session(request.cookies.get(SESSION_COOKIE)):
+        return page(
+            "Inbox",
+            """<div class="inbox">
+<h1 style="font-size:1.9rem">Inbox</h1>
+<form method="post" action="/inbox/login">
+  <input type="password" name="password" placeholder="Password" required autofocus>
+  <button class="btn btn-primary" type="submit">Sign in</button>
+</form></div>""",
+        )
+
+    with closing(connect()) as conn:
+        rows = conn.execute(
+            "SELECT id, ts, name, email, subject, body, read FROM messages ORDER BY id DESC LIMIT 200"
+        ).fetchall()
+        (unread,) = conn.execute("SELECT COUNT(*) FROM messages WHERE read = 0").fetchone()
+
+    items = []
+    for r in rows:
+        subject = html.escape(r["subject"]) or "(no subject)"
+        items.append(
+            f"""<article class="msg{' unread' if not r['read'] else ''}">
+  <h3>{subject}</h3>
+  <p class="meta">{html.escape(r['name'])} &lt;{html.escape(r['email'])}&gt; · {html.escape(r['ts'])} UTC</p>
+  <p class="body">{html.escape(r['body'])}</p>
+  <div class="row">
+    <a class="btn btn-primary btn-sm" href="mailto:{html.escape(r['email'])}?subject=Re: {html.escape(subject)}">Reply</a>
+    <form method="post" action="/inbox/read/{r['id']}"><button class="btn btn-ghost btn-sm" type="submit">
+      {'Mark unread' if r['read'] else 'Mark read'}</button></form>
+    <form method="post" action="/inbox/delete/{r['id']}"><button class="btn btn-ghost btn-sm" type="submit">Delete</button></form>
+  </div>
+</article>"""
+        )
+    body = "".join(items) or '<p class="note">No messages yet.</p>'
+    return page(
+        "Inbox",
+        f"""<div class="inbox">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+  <h1 style="font-size:1.9rem">Inbox <span class="accent">({unread} unread)</span></h1>
+  <div style="display:flex;gap:10px">
+    <a class="btn btn-ghost btn-sm" href="/">Back to site</a>
+    <form method="post" action="/inbox/logout"><button class="btn btn-ghost btn-sm" type="submit">Sign out</button></form>
+  </div>
+</div>{body}</div>""",
+    )
+
+
+@app.post("/inbox/setup")
+def inbox_setup(password: str = Form(""), confirm: str = Form("")) -> Response:
+    if get_setting("owner_password"):
+        return RedirectResponse("/inbox", status_code=303)
+    if len(password) < 10 or password != confirm:
+        return RedirectResponse("/inbox", status_code=303)
+    set_setting("owner_password", hash_password(password))
+    response = RedirectResponse("/inbox", status_code=303)
+    response.set_cookie(
+        SESSION_COOKIE, make_session(), httponly=True, samesite="lax", max_age=SESSION_TTL, path="/"
+    )
+    return response
+
+
+@app.post("/inbox/login")
+def inbox_login(password: str = Form("")) -> Response:
+    stored = get_setting("owner_password")
+    response = RedirectResponse("/inbox", status_code=303)
+    if stored and verify_password(password, stored):
+        response.set_cookie(
+            SESSION_COOKIE, make_session(), httponly=True, samesite="lax", max_age=SESSION_TTL, path="/"
+        )
+    return response
+
+
+@app.post("/inbox/logout")
+def inbox_logout() -> Response:
+    response = RedirectResponse("/inbox", status_code=303)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return response
+
+
+@app.post("/inbox/read/{message_id}")
+def inbox_read(message_id: int, request: Request) -> Response:
+    if valid_session(request.cookies.get(SESSION_COOKIE)):
+        with closing(connect()) as conn, conn:
+            conn.execute("UPDATE messages SET read = 1 - read WHERE id = ?", (message_id,))
+    return RedirectResponse("/inbox", status_code=303)
+
+
+@app.post("/inbox/delete/{message_id}")
+def inbox_delete(message_id: int, request: Request) -> Response:
+    if valid_session(request.cookies.get(SESSION_COOKIE)):
+        with closing(connect()) as conn, conn:
+            conn.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+    return RedirectResponse("/inbox", status_code=303)
+
+
+# --------------------------------------------------------------------------
+# static site (mounted last so the routes above win)
+# --------------------------------------------------------------------------
+@app.exception_handler(404)
+async def not_found(request: Request, exc) -> Response:  # noqa: ANN001
+    target = PUBLIC_DIR / "404.html"
+    if target.exists():
+        return FileResponse(target, status_code=404)
+    return HTMLResponse("Not found", status_code=404)
+
+
+app.mount("/", StaticFiles(directory=PUBLIC_DIR, html=True), name="site")

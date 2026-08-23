@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /inbox
+
+Sitemap: https://mellow-pebble-31.s1.seeiousercontent.com/sitemap.xml

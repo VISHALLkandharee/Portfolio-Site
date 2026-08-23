@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Task-Flow, multi-tenant team task management SaaS | Vishal Kumar</title>
+<meta name="description" content="A complete multi-tenant SaaS: tenant-isolated workspaces, Stripe subscription billing, real-time Kanban and a Redis-backed job queue.">
+<meta name="theme-color" content="#080b10">
+<link rel="canonical" href="https://mellow-pebble-31.s1.seeiousercontent.com/work/task-flow.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Task-Flow, multi-tenant team task management SaaS">
+<meta property="og:description" content="A complete multi-tenant SaaS: tenant-isolated workspaces, Stripe subscription billing, real-time Kanban and a Redis-backed job queue.">
+<meta property="og:url" content="https://mellow-pebble-31.s1.seeiousercontent.com/work/task-flow.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css?v=3">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%232dd4bf'/><text x='50' y='68' font-size='42' font-family='Helvetica,Arial,sans-serif' font-weight='bold' fill='%23042220' text-anchor='middle'>VK</text></svg>">
+<script>
+  (function(){try{var t=localStorage.getItem('vk-theme');
+  if(!t)t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+  document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"CreativeWork","name":"Task-Flow","author":{"@type":"Person","name":"Vishal Kumar"},"description":"A complete multi-tenant SaaS: tenant-isolated workspaces, Stripe subscription billing, real-time Kanban and a Redis-backed job queue.","url":"https://mellow-pebble-31.s1.seeiousercontent.com/work/task-flow.html"}</script>
+</head>
+<body id="top">
+<div class="ambient" aria-hidden="true"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
+<div class="grid-bg" aria-hidden="true"></div>
+
+<header class="site-head">
+  <div class="progress" aria-hidden="true"></div>
+  <div class="wrap">
+    <a class="brand" href="/"><span class="mark">VK</span><span>Vishal Kumar<small>Full Stack Developer</small></span></a>
+    <nav class="nav" id="nav">
+      <a href="/#about">About</a>
+      <a href="/#stack">Stack</a>
+      <a href="/#projects">Work</a>
+      <a href="/#experience">Experience</a>
+      <a href="/#faq">FAQ</a>
+      <a href="/#contact" class="btn btn-primary btn-sm">Hire me</a>
+    </nav>
+    <div class="head-tools">
+      <button class="icon-btn theme-toggle" type="button" aria-label="Switch theme">☀</button>
+      <button class="icon-btn nav-toggle" type="button" aria-expanded="false" aria-controls="nav" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="case-hero">
+    <div class="wrap">
+      <a class="back-link" href="/#projects">← Back to all work</a>
+      <p class="kicker" style="margin-top:24px">Multi-tenant SaaS</p>
+      <h1 style="font-size:clamp(2.2rem,5vw,3.6rem);margin-top:10px">Task-Flow</h1>
+      <p class="lead" style="margin-top:16px;max-width:60ch;font-size:1.05rem">A complete multi-tenant SaaS: tenant-isolated workspaces, Stripe subscription billing, real-time Kanban and a Redis-backed job queue.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://task-flow-nu-sepia.vercel.app/" target="_blank" rel="noopener">Open the live app ↗</a>
+        <a class="btn btn-ghost" href="https://github.com/VISHALLkandharee/Task-Flow" target="_blank" rel="noopener">Read the source ↗</a>
+      </div>
+      <div class="case-meta"><div><span>Role</span><strong>Solo full stack developer</strong></div><div><span>Type</span><strong>Product build, end to end</strong></div><div><span>Status</span><strong>Live and open source</strong></div><div><span>Focus</span><strong>SaaS architecture</strong></div></div>
+    </div>
+  </section>
+
+  <section style="padding-top:20px">
+    <div class="wrap case-grid">
+      <div class="prose"><section style="padding:0 0 42px" class="reveal"><h2>The problem</h2><p>Small teams outgrow a shared spreadsheet quickly, but the tools that replace it are either too heavy or priced per seat in a way that punishes growth. I wanted to build the full thing rather than a demo: a product that a real team could sign up for, pay for, and use together in the same second.</p>
+<p>That meant solving the three things a task board demo usually skips: <strong>tenant isolation</strong>, <strong>billing</strong> and <strong>real-time state</strong>.</p></section><section style="padding:0 0 42px" class="reveal"><h2>What I built</h2><ul>
+<li><strong>Multi-tenant workspaces</strong> where every record is scoped to a tenant at the database level, so one workspace can never read another's data.</li>
+<li><strong>Role-based access control</strong> with three tiers, Admin, Manager and Member, enforced at the API layer and reflected in the UI so people never see actions they cannot take.</li>
+<li><strong>Stripe subscription billing</strong> with webhook handling, so plan changes, renewals and failed payments update the account state without manual intervention.</li>
+<li><strong>A drag-and-drop Kanban board</strong> that broadcasts every move over Socket.io, so a card dragged on one screen lands on everyone else's board without a refresh.</li>
+<li><strong>A BullMQ and Redis job queue</strong> for email notifications, assignment alerts and scheduled reminders, decoupled from the request cycle.</li>
+</ul></section><section style="padding:0 0 42px" class="reveal"><h2>Architecture decisions</h2><h3>Isolation at the data layer, not the query layer</h3>
+<p>Tenant scoping lives in the schema and the data access layer rather than being remembered at each call site. A missed filter is the classic multi-tenant leak, so the safe path is the default path.</p>
+<h3>RBAC enforced twice, on purpose</h3>
+<p>Permissions are checked on the API because that is the boundary that matters, and mirrored in the UI because hiding an action a user cannot perform is a better experience than showing them an error.</p>
+<h3>Webhooks as the source of truth for billing</h3>
+<p>The client never decides whether a subscription is active. Stripe webhooks drive the account state, which keeps billing correct even when a user closes the tab mid-checkout.</p>
+<h3>Queues for anything that can wait</h3>
+<p>Email and reminders run through BullMQ on Redis. The API returns as soon as the write is durable, and the slow work happens out of band where a failure can be retried rather than surfaced to the user.</p></section><section style="padding:0 0 42px" class="reveal"><h2>Hard parts</h2><ul>
+<li><strong>Keeping the real-time board consistent.</strong> Drag and drop is optimistic by nature, so the UI has to move immediately and still agree with the server and with every other connected client afterwards.</li>
+<li><strong>Making billing state and permission state agree.</strong> A downgrade has to change what people can do, immediately, and without locking anyone out of data they already own.</li>
+<li><strong>Testing the tenant boundary.</strong> The interesting bugs in multi-tenant systems are the ones you only see with two tenants and a shared cache in play.</li>
+</ul></section><section style="padding:0 0 42px" class="reveal"><h2>Outcome</h2><p>Task-Flow is the project I point recruiters and clients to first, because it covers the full surface of a commercial SaaS product: authentication, tenancy, permissions, payments, real-time collaboration and background processing, deployed and running rather than described in a README.</p></section></div>
+      <aside class="card side-card reveal">
+        <h3 style="font-size:1rem;margin-bottom:14px">Stack</h3>
+        <ul class="chips"><li>Next.js</li><li>TypeScript</li><li>Node.js</li><li>Express.js</li><li>PostgreSQL</li><li>Prisma</li><li>Stripe + webhooks</li><li>Socket.io</li><li>BullMQ</li><li>Redis</li><li>Tailwind CSS</li></ul>
+        <div style="display:grid;gap:10px;margin-top:22px">
+          <a class="btn btn-primary btn-sm" href="https://task-flow-nu-sepia.vercel.app/" target="_blank" rel="noopener">Live app ↗</a>
+          <a class="btn btn-ghost btn-sm" href="https://github.com/VISHALLkandharee/Task-Flow" target="_blank" rel="noopener">Source code ↗</a>
+          <a class="btn btn-ghost btn-sm" href="/#contact">Ask me about it</a>
+        </div>
+      </aside>
+    </div>
+    <div class="wrap">
+      <div class="next-case reveal">
+        <div><p class="kicker">Next case study</p><h3 style="margin-top:6px">Route-Master, AI route optimisation</h3></div>
+        <a class="btn btn-ghost" href="/work/route-master.html">Read it ↗</a>
+      </div>
+    </div>
+  </section>
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-cta">
+      <div>
+        <h2>Have a project or a role in mind?</h2>
+        <p style="margin-top:8px">Remote friendly, available now, replies within a working day.</p>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <a class="btn btn-primary" href="/#contact">Start a conversation</a>
+        <a class="btn btn-ghost" href="/assets/Vishal-Kumar-Resume.pdf" download>Resume (PDF)</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>&copy; <span id="year">2026</span> Vishal Kumar. Built and deployed by hand.</span>
+      <span>
+        <a href="https://github.com/VISHALLkandharee" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://www.linkedin.com/in/vishal-kumar-87a19730b/" target="_blank" rel="noopener">LinkedIn</a> ·
+        <a href="mailto:vishall.kandharee@gmail.com">Email</a> ·
+        <a href="tel:+923000249930">+92 300 0249930</a>
+      </span>
+    </div>
+  </div>
+</footer>
+<script src="/app.js?v=3"></script>
+
+</body>
+</html>

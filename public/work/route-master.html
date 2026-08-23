@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Route-Master, AI-powered route optimisation | Vishal Kumar</title>
+<meta name="description" content="A route planning assistant built on the Anthropic Claude SDK that takes a day's stops and turns them into a sensible route, on a live map, behind a subscription.">
+<meta name="theme-color" content="#080b10">
+<link rel="canonical" href="https://mellow-pebble-31.s1.seeiousercontent.com/work/route-master.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Route-Master, AI-powered route optimisation">
+<meta property="og:description" content="A route planning assistant built on the Anthropic Claude SDK that takes a day's stops and turns them into a sensible route, on a live map, behind a subscription.">
+<meta property="og:url" content="https://mellow-pebble-31.s1.seeiousercontent.com/work/route-master.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css?v=3">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%232dd4bf'/><text x='50' y='68' font-size='42' font-family='Helvetica,Arial,sans-serif' font-weight='bold' fill='%23042220' text-anchor='middle'>VK</text></svg>">
+<script>
+  (function(){try{var t=localStorage.getItem('vk-theme');
+  if(!t)t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+  document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"CreativeWork","name":"Route-Master","author":{"@type":"Person","name":"Vishal Kumar"},"description":"A route planning assistant built on the Anthropic Claude SDK that takes a day's stops and turns them into a sensible route, on a live map, behind a subscription.","url":"https://mellow-pebble-31.s1.seeiousercontent.com/work/route-master.html"}</script>
+</head>
+<body id="top">
+<div class="ambient" aria-hidden="true"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
+<div class="grid-bg" aria-hidden="true"></div>
+
+<header class="site-head">
+  <div class="progress" aria-hidden="true"></div>
+  <div class="wrap">
+    <a class="brand" href="/"><span class="mark">VK</span><span>Vishal Kumar<small>Full Stack Developer</small></span></a>
+    <nav class="nav" id="nav">
+      <a href="/#about">About</a>
+      <a href="/#stack">Stack</a>
+      <a href="/#projects">Work</a>
+      <a href="/#experience">Experience</a>
+      <a href="/#faq">FAQ</a>
+      <a href="/#contact" class="btn btn-primary btn-sm">Hire me</a>
+    </nav>
+    <div class="head-tools">
+      <button class="icon-btn theme-toggle" type="button" aria-label="Switch theme">☀</button>
+      <button class="icon-btn nav-toggle" type="button" aria-expanded="false" aria-controls="nav" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="case-hero">
+    <div class="wrap">
+      <a class="back-link" href="/#projects">← Back to all work</a>
+      <p class="kicker" style="margin-top:24px">AI product</p>
+      <h1 style="font-size:clamp(2.2rem,5vw,3.6rem);margin-top:10px">Route-Master</h1>
+      <p class="lead" style="margin-top:16px;max-width:60ch;font-size:1.05rem">A route planning assistant built on the Anthropic Claude SDK that takes a day's stops and turns them into a sensible route, on a live map, behind a subscription.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://route-master-sooty.vercel.app" target="_blank" rel="noopener">Open the live app ↗</a>
+        <a class="btn btn-ghost" href="https://github.com/VISHALLkandharee/Route-Master" target="_blank" rel="noopener">Read the source ↗</a>
+      </div>
+      <div class="case-meta"><div><span>Role</span><strong>Solo full stack developer</strong></div><div><span>Type</span><strong>AI product build</strong></div><div><span>Status</span><strong>Live and open source</strong></div><div><span>Focus</span><strong>LLM integration, maps</strong></div></div>
+    </div>
+  </section>
+
+  <section style="padding-top:20px">
+    <div class="wrap case-grid">
+      <div class="prose"><section style="padding:0 0 42px" class="reveal"><h2>The problem</h2><p>Solo business owners, the people running a delivery van, a catering round or a repair service on their own, plan their day on paper or in their head. Enterprise route optimisation software exists, but it is priced and shaped for fleets, not for one person with fifteen stops and a phone.</p>
+<p>Route-Master is built for that person: put the day's stops in, get a route back that makes sense, on a map, in seconds.</p></section><section style="padding:0 0 42px" class="reveal"><h2>What I built</h2><ul>
+<li><strong>An AI planning layer on the Anthropic Claude SDK</strong> that reasons about the day's stops and returns an ordered, practical route rather than only a raw distance calculation.</li>
+<li><strong>An interactive Leaflet map</strong> so the plan is something you look at and adjust, not a list of addresses to interpret.</li>
+<li><strong>Stripe subscription billing</strong> for the paid tier, wired the same way as the rest of the product rather than bolted on at the end.</li>
+<li><strong>A Supabase backend</strong> for auth and storage, with Zustand handling client state and Framer Motion carrying the interface transitions.</li>
+<li><strong>Zod schemas</strong> validating both user input and the model's structured output, so a bad response never reaches the map.</li>
+</ul></section><section style="padding:0 0 42px" class="reveal"><h2>Architecture decisions</h2><h3>Treat the model's output as untrusted input</h3>
+<p>Everything coming back from the LLM is parsed and validated against a Zod schema before the application uses it. A language model is a very capable component, and like any external service it needs a contract at the boundary.</p>
+<h3>Keep the map authoritative for what the user sees</h3>
+<p>The AI proposes, the map presents, and the user decides. Route planning is a domain where local knowledge beats any model, so the interface is built for adjusting the plan, not just accepting it.</p>
+<h3>Latest Next.js, with types all the way through</h3>
+<p>Built on Next.js 16 and TypeScript end to end, from the map components down to the API handlers, so a shape change surfaces at build time rather than in production.</p></section><section style="padding:0 0 42px" class="reveal"><h2>Hard parts</h2><ul>
+<li><strong>Making AI output reliable enough to build a product on.</strong> Prompting is only half of it: the schema validation, the retries and the fallbacks are what make the feature dependable.</li>
+<li><strong>Latency versus quality.</strong> A planning call that thinks for too long feels broken, so the interface has to keep the user informed while the work happens.</li>
+<li><strong>Map interaction on a phone.</strong> The people this is built for are standing next to a van, not sitting at a desk.</li>
+</ul></section><section style="padding:0 0 42px" class="reveal"><h2>Outcome</h2><p>Route-Master is a working, deployed product that solves a real operational pain point for a specific kind of business, and it is the project where I learned to build with an LLM as a dependable component of a system rather than as a novelty.</p></section></div>
+      <aside class="card side-card reveal">
+        <h3 style="font-size:1rem;margin-bottom:14px">Stack</h3>
+        <ul class="chips"><li>Next.js 16</li><li>TypeScript</li><li>Anthropic Claude SDK</li><li>Supabase</li><li>Leaflet</li><li>Stripe</li><li>Zustand</li><li>Framer Motion</li><li>Zod</li></ul>
+        <div style="display:grid;gap:10px;margin-top:22px">
+          <a class="btn btn-primary btn-sm" href="https://route-master-sooty.vercel.app" target="_blank" rel="noopener">Live app ↗</a>
+          <a class="btn btn-ghost btn-sm" href="https://github.com/VISHALLkandharee/Route-Master" target="_blank" rel="noopener">Source code ↗</a>
+          <a class="btn btn-ghost btn-sm" href="/#contact">Ask me about it</a>
+        </div>
+      </aside>
+    </div>
+    <div class="wrap">
+      <div class="next-case reveal">
+        <div><p class="kicker">Next case study</p><h3 style="margin-top:6px">SaaS Pulse, real-time analytics</h3></div>
+        <a class="btn btn-ghost" href="/work/saas-pulse.html">Read it ↗</a>
+      </div>
+    </div>
+  </section>
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-cta">
+      <div>
+        <h2>Have a project or a role in mind?</h2>
+        <p style="margin-top:8px">Remote friendly, available now, replies within a working day.</p>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <a class="btn btn-primary" href="/#contact">Start a conversation</a>
+        <a class="btn btn-ghost" href="/assets/Vishal-Kumar-Resume.pdf" download>Resume (PDF)</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>&copy; <span id="year">2026</span> Vishal Kumar. Built and deployed by hand.</span>
+      <span>
+        <a href="https://github.com/VISHALLkandharee" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://www.linkedin.com/in/vishal-kumar-87a19730b/" target="_blank" rel="noopener">LinkedIn</a> ·
+        <a href="mailto:vishall.kandharee@gmail.com">Email</a> ·
+        <a href="tel:+923000249930">+92 300 0249930</a>
+      </span>
+    </div>
+  </div>
+</footer>
+<script src="/app.js?v=3"></script>
+
+</body>
+</html>

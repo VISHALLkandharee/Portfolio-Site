@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SaaS Pulse, real-time startup analytics dashboard | Vishal Kumar</title>
+<meta name="description" content="A founder command centre: MRR, churn and live signups in one view, with a zero-latency activity feed and role-scoped access.">
+<meta name="theme-color" content="#080b10">
+<link rel="canonical" href="https://mellow-pebble-31.s1.seeiousercontent.com/work/saas-pulse.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SaaS Pulse, real-time startup analytics dashboard">
+<meta property="og:description" content="A founder command centre: MRR, churn and live signups in one view, with a zero-latency activity feed and role-scoped access.">
+<meta property="og:url" content="https://mellow-pebble-31.s1.seeiousercontent.com/work/saas-pulse.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css?v=3">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%232dd4bf'/><text x='50' y='68' font-size='42' font-family='Helvetica,Arial,sans-serif' font-weight='bold' fill='%23042220' text-anchor='middle'>VK</text></svg>">
+<script>
+  (function(){try{var t=localStorage.getItem('vk-theme');
+  if(!t)t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+  document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"CreativeWork","name":"SaaS Pulse","author":{"@type":"Person","name":"Vishal Kumar"},"description":"A founder command centre: MRR, churn and live signups in one view, with a zero-latency activity feed and role-scoped access.","url":"https://mellow-pebble-31.s1.seeiousercontent.com/work/saas-pulse.html"}</script>
+</head>
+<body id="top">
+<div class="ambient" aria-hidden="true"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
+<div class="grid-bg" aria-hidden="true"></div>
+
+<header class="site-head">
+  <div class="progress" aria-hidden="true"></div>
+  <div class="wrap">
+    <a class="brand" href="/"><span class="mark">VK</span><span>Vishal Kumar<small>Full Stack Developer</small></span></a>
+    <nav class="nav" id="nav">
+      <a href="/#about">About</a>
+      <a href="/#stack">Stack</a>
+      <a href="/#projects">Work</a>
+      <a href="/#experience">Experience</a>
+      <a href="/#faq">FAQ</a>
+      <a href="/#contact" class="btn btn-primary btn-sm">Hire me</a>
+    </nav>
+    <div class="head-tools">
+      <button class="icon-btn theme-toggle" type="button" aria-label="Switch theme">☀</button>
+      <button class="icon-btn nav-toggle" type="button" aria-expanded="false" aria-controls="nav" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="case-hero">
+    <div class="wrap">
+      <a class="back-link" href="/#projects">← Back to all work</a>
+      <p class="kicker" style="margin-top:24px">Analytics dashboard</p>
+      <h1 style="font-size:clamp(2.2rem,5vw,3.6rem);margin-top:10px">SaaS Pulse</h1>
+      <p class="lead" style="margin-top:16px;max-width:60ch;font-size:1.05rem">A founder command centre: MRR, churn and live signups in one view, with a zero-latency activity feed and role-scoped access.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://saas-pulse-liart.vercel.app" target="_blank" rel="noopener">Open the live app ↗</a>
+        <a class="btn btn-ghost" href="https://github.com/VISHALLkandharee/Saas-Pulse-" target="_blank" rel="noopener">Read the source ↗</a>
+      </div>
+      <div class="case-meta"><div><span>Role</span><strong>Solo full stack developer</strong></div><div><span>Type</span><strong>Product build</strong></div><div><span>Status</span><strong>Live and open source</strong></div><div><span>Focus</span><strong>Real-time data, auth</strong></div></div>
+    </div>
+  </section>
+
+  <section style="padding-top:20px">
+    <div class="wrap case-grid">
+      <div class="prose"><section style="padding:0 0 42px" class="reveal"><h2>The problem</h2><p>Early stage founders read their numbers from three different tabs and a spreadsheet that is always a week behind. The questions they actually ask are immediate: is revenue growing this week, who cancelled, who just signed up.</p>
+<p>SaaS Pulse puts those answers on one screen and keeps them current.</p></section><section style="padding:0 0 42px" class="reveal"><h2>What I built</h2><ul>
+<li><strong>A metrics dashboard</strong> tracking MRR, churn and user signups, designed so the trend is legible at a glance rather than buried in a table.</li>
+<li><strong>A live activity feed</strong> with no perceptible delay, so signups and cancellations appear as they happen.</li>
+<li><strong>Custom JWT authentication</strong> with role-based access control, giving founders and team members appropriately scoped views of the same data.</li>
+</ul></section><section style="padding:0 0 42px" class="reveal"><h2>Architecture decisions</h2><h3>Auth built rather than bought, deliberately</h3>
+<p>SaaS Pulse uses a custom JWT implementation because I wanted the full mechanism in my hands: issuing, verifying, scoping and expiring tokens, with roles carried through to every protected route.</p>
+<h3>Read paths shaped by the questions being asked</h3>
+<p>A dashboard is a read-heavy product. The data model is organised around the handful of questions the page asks constantly, rather than being a generic schema that needs expensive aggregation on every load.</p>
+<h3>Feed first, charts second</h3>
+<p>The activity feed is the part founders keep open, so it gets the lowest latency path through the stack, with the aggregate metrics computed around it.</p></section><section style="padding:0 0 42px" class="reveal"><h2>Hard parts</h2><ul>
+<li><strong>Defining churn honestly.</strong> The metric is easy to compute and easy to compute wrongly, and the definition has to match how the founder thinks about their business.</li>
+<li><strong>Keeping the feed cheap.</strong> Live is a user expectation, not an excuse to hammer the database on a timer.</li>
+<li><strong>Role scoping without duplicating the UI.</strong> One dashboard, several audiences, one code path.</li>
+</ul></section><section style="padding:0 0 42px" class="reveal"><h2>Outcome</h2><p>SaaS Pulse is the project where I went deepest on authentication and on shaping data for the way a screen is actually read. It is live, open source, and the auth patterns from it carried straight into Task-Flow.</p></section></div>
+      <aside class="card side-card reveal">
+        <h3 style="font-size:1rem;margin-bottom:14px">Stack</h3>
+        <ul class="chips"><li>Next.js</li><li>Node.js</li><li>MongoDB</li><li>JWT</li><li>RBAC</li><li>Tailwind CSS</li></ul>
+        <div style="display:grid;gap:10px;margin-top:22px">
+          <a class="btn btn-primary btn-sm" href="https://saas-pulse-liart.vercel.app" target="_blank" rel="noopener">Live app ↗</a>
+          <a class="btn btn-ghost btn-sm" href="https://github.com/VISHALLkandharee/Saas-Pulse-" target="_blank" rel="noopener">Source code ↗</a>
+          <a class="btn btn-ghost btn-sm" href="/#contact">Ask me about it</a>
+        </div>
+      </aside>
+    </div>
+    <div class="wrap">
+      <div class="next-case reveal">
+        <div><p class="kicker">Next case study</p><h3 style="margin-top:6px">Task-Flow, multi-tenant SaaS</h3></div>
+        <a class="btn btn-ghost" href="/work/task-flow.html">Read it ↗</a>
+      </div>
+    </div>
+  </section>
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-cta">
+      <div>
+        <h2>Have a project or a role in mind?</h2>
+        <p style="margin-top:8px">Remote friendly, available now, replies within a working day.</p>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <a class="btn btn-primary" href="/#contact">Start a conversation</a>
+        <a class="btn btn-ghost" href="/assets/Vishal-Kumar-Resume.pdf" download>Resume (PDF)</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>&copy; <span id="year">2026</span> Vishal Kumar. Built and deployed by hand.</span>
+      <span>
+        <a href="https://github.com/VISHALLkandharee" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://www.linkedin.com/in/vishal-kumar-87a19730b/" target="_blank" rel="noopener">LinkedIn</a> ·
+        <a href="mailto:vishall.kandharee@gmail.com">Email</a> ·
+        <a href="tel:+923000249930">+92 300 0249930</a>
+      </span>
+    </div>
+  </div>
+</footer>
+<script src="/app.js?v=3"></script>
+
+</body>
+</html>

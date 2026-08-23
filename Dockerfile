@@ -1,5 +1,10 @@
-# see.io site contract: serve plain HTTP on :8080 (the platform terminates TLS).
-FROM busybox:stable
-COPY . /www
+# see.io site contract: plain HTTP on :8080 (the platform terminates TLS).
+# State lives ONLY under /data, the volume mounted at runtime.
+FROM python:3.12-slim
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
 EXPOSE 8080
-CMD ["httpd", "-f", "-p", "8080", "-h", "/www"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
