@@ -52,7 +52,7 @@ MAX_MESSAGE = 4000
 # The owner password is set at build time and only its PBKDF2 hash is stored
 # here, so the repository holds no usable secret. The owner can replace it from
 # inside the inbox, which writes a new hash to /data and takes precedence.
-BOOTSTRAP_PASSWORD_HASH = "6fd7ef3cc6885730c6804319a1c762df$96285c0c15c1ec47d4e4d10a74a9a45fc27a5565eedd476fb22e45b836c8fe5e"
+BOOTSTRAP_PASSWORD_HASH = "6fb196411648659784f814c1e9ee0460$7f8d88bd6303c61986f81db1d20c18609f3c231bbd789287d2ef4138d1b06c41"
 
 LOGIN_WINDOW = 900
 LOGIN_MAX_ATTEMPTS = 10
@@ -402,6 +402,8 @@ def page(title: str, body: str) -> HTMLResponse:
  .msg p.body{{white-space:pre-wrap;color:var(--text);font-size:.96rem}}
  .msg .row{{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}}
  .note{{color:var(--muted);font-size:.9rem;margin-top:10px}}
+ .reveal-pw{{display:flex;align-items:center;gap:9px;font-size:.88rem;color:var(--muted);cursor:pointer}}
+ .reveal-pw input{{width:auto;margin:0;accent-color:var(--accent)}}
 </style></head><body>{body}</body></html>"""
     )
 
@@ -466,9 +468,18 @@ def login_page(note: str = "") -> HTMLResponse:
 <p class="note">Messages sent through the contact form on the site.</p>
 {warning}
 <form method="post" action="/inbox/login">
-  <input type="password" name="password" placeholder="Password" required autofocus autocomplete="current-password">
+  <input id="pw" type="password" name="password" placeholder="Password" required autofocus
+         autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false">
+  <label class="reveal-pw"><input type="checkbox" id="show-pw"> Show what I typed</label>
   <button class="btn btn-primary" type="submit">Sign in</button>
 </form>
+<p class="note" style="margin-top:18px">The password is all lower case, and deliberately contains no
+look-alike characters: no letter i, l or o, and no digit 0 or 1. Tick the box above to check what you typed.</p>
+<script>
+  document.getElementById('show-pw').addEventListener('change', function () {{
+    document.getElementById('pw').type = this.checked ? 'text' : 'password';
+  }});
+</script>
 <p class="note" style="margin-top:22px"><a href="/" style="color:var(--accent)">Back to the site</a></p></div>""",
     )
 
@@ -532,6 +543,7 @@ The rest of the site is unaffected. Try again shortly.</p>
 
 @app.post("/inbox/login")
 def inbox_login(request: Request, password: str = Form("")) -> Response:
+    password = password.strip()  # pasted passwords often carry a space or newline
     bucket, _ = client_ip_hash(request)
     if not login_allowed(bucket):
         return login_page("Too many attempts. Wait a few minutes and try again.")
@@ -541,7 +553,7 @@ def inbox_login(request: Request, password: str = Form("")) -> Response:
         sign_in(response)
         return response
     login_seen(bucket)
-    return login_page("That password is not right.")
+    return login_page("That password is not right. Tick \"Show what I typed\" to check it, and remember it is all lower case.")
 
 
 @app.get("/inbox/password", response_class=HTMLResponse)
@@ -573,6 +585,7 @@ def password_change(
     confirm: str = Form(""),
     csrf: str = Form(""),
 ) -> Response:
+    current, password, confirm = current.strip(), password.strip(), confirm.strip()
     session = request.cookies.get(SESSION_COOKIE)
     if not valid_session(session) or not csrf_ok(request, csrf):
         return login_page()

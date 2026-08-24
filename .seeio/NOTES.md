@@ -18,6 +18,9 @@ plus a working contact form. Homepage + three project case studies + 404.
 ## Architecture
 - `main.py` (FastAPI) + `public/` static files. Healthcheck: /healthz.
 - Contact form POSTs to /api/contact, stored in SQLite at /data/app.db (created on first boot, /data is the only persistent path).
+- OWNER LOGIN NOTE (2026-08-24): the first build-time password mixed a digit 1 with a lowercase l and the owner
+  could not type it. Passwords are now generated from an alphabet with no look-alike characters (no i, l, o, 0, 1),
+  the login form has a "show what I typed" toggle, and submitted passwords are stripped of stray whitespace.
 - OWNER LOGIN: the password is set at build time; only its PBKDF2 hash lives in main.py (BOOTSTRAP_PASSWORD_HASH).
   There is no self-service "claim the inbox" flow any more (it was a takeover risk once the footer linked /inbox).
   The owner can change the password from inside the inbox, which stores a new hash in /data and takes precedence.
