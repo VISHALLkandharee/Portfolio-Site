@@ -349,6 +349,13 @@ section{padding:88px 0;position:relative}
 .foot-bottom a{color:var(--muted);text-decoration:none}
 .foot-bottom a:hover{color:var(--accent)}
 
+.inbox-link{
+  display:inline-flex;align-items:center;gap:7px;padding:5px 13px;border-radius:100px;
+  border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));
+  background:var(--surface);color:var(--accent)!important;font-weight:550;
+}
+.inbox-link:hover{border-color:var(--accent);background:var(--glow)}
+
 /* owner badge, only rendered for a signed-in owner */
 .owner-badge{
   position:fixed;right:20px;bottom:20px;z-index:90;display:inline-flex;align-items:center;gap:9px;

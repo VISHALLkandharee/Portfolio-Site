@@ -18,6 +18,7 @@ import os
 import re
 import secrets
 import sqlite3
+from urllib.parse import quote
 import time
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
@@ -199,6 +200,8 @@ async def security_headers(request: Request, call_next):  # noqa: ANN001
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    if request.url.path.startswith(("/inbox", "/api/")):
+        response.headers["Cache-Control"] = "no-store"
     return response
 
 
@@ -297,7 +300,8 @@ def page(title: str, body: str) -> HTMLResponse:
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>{html.escape(title)}</title>
-<link rel="stylesheet" href="/style.css?v=5">
+<link rel="stylesheet" href="/fonts.css?v=1">
+<link rel="stylesheet" href="/style.css?v=6">
 <style>
  body{{padding:40px 0}}
  .inbox{{max-width:860px;margin:0 auto;padding:0 24px}}
@@ -350,14 +354,15 @@ Contact form messages are kept here.</p>
 
     items = []
     for r in rows:
-        subject = html.escape(r["subject"]) or "(no subject)"
+        raw_subject = r["subject"] or "(no subject)"
+        subject = html.escape(raw_subject)
         items.append(
             f"""<article class="msg{' unread' if not r['read'] else ''}">
   <h3>{subject}</h3>
   <p class="meta">{html.escape(r['name'])} &lt;{html.escape(r['email'])}&gt; · {html.escape(r['ts'])} UTC</p>
   <p class="body">{html.escape(r['body'])}</p>
   <div class="row">
-    <a class="btn btn-primary btn-sm" href="mailto:{html.escape(r['email'])}?subject=Re: {html.escape(subject)}">Reply</a>
+    <a class="btn btn-primary btn-sm" href="mailto:{quote(r['email'])}?subject={quote('Re: ' + raw_subject)}">Reply</a>
     <form method="post" action="/inbox/read/{r['id']}"><button class="btn btn-ghost btn-sm" type="submit">
       {'Mark unread' if r['read'] else 'Mark read'}</button></form>
     <form method="post" action="/inbox/delete/{r['id']}"><button class="btn btn-ghost btn-sm" type="submit">Delete</button></form>
@@ -447,6 +452,31 @@ def inbox_delete(message_id: int, request: Request) -> Response:
 # --------------------------------------------------------------------------
 # static site (mounted last so the routes above win)
 # --------------------------------------------------------------------------
+class CachedStatic(StaticFiles):
+    """Serve the site with explicit caching rules.
+
+    Without a Cache-Control header a browser is free to invent its own
+    freshness lifetime, so an updated page can stay invisible to someone who
+    visited before. HTML therefore always revalidates (cheap: the ETag
+    usually turns it into a 304), while CSS and JS are versioned by a ?v=
+    query and can be held for a week.
+    """
+
+    async def get_response(self, path: str, scope):  # noqa: ANN001, ANN201
+        response = await super().get_response(path, scope)
+        lowered = path.lower()
+        if lowered.endswith((".html", "/")) or "." not in lowered.rsplit("/", 1)[-1]:
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        elif lowered.endswith((".css", ".js")):
+            response.headers["Cache-Control"] = "public, max-age=604800"
+        elif lowered.endswith((".woff2", ".woff")):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif lowered.endswith((".pdf", ".png", ".jpg", ".jpeg", ".svg", ".webp", ".ico")):
+            response.headers["Cache-Control"] = "public, max-age=86400"
+        else:
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
 @app.exception_handler(404)
 async def not_found(request: Request, exc) -> Response:  # noqa: ANN001
     target = PUBLIC_DIR / "404.html"
@@ -455,4 +485,4 @@ async def not_found(request: Request, exc) -> Response:  # noqa: ANN001
     return HTMLResponse("Not found", status_code=404)
 
 
-app.mount("/", StaticFiles(directory=PUBLIC_DIR, html=True), name="site")
+app.mount("/", CachedStatic(directory=PUBLIC_DIR, html=True), name="site")
