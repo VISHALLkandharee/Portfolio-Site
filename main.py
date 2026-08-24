@@ -108,6 +108,21 @@ def init_db() -> None:
     if not SECRET_PATH.exists():
         SECRET_PATH.write_text(secrets.token_hex(32), encoding="utf-8")
 
+    # One-time migration. An earlier version let the first visitor to /inbox
+    # set the owner password, so any password already stored could have been
+    # set by a stranger. Retire it once, then never again: a password the
+    # owner sets from inside the inbox is written after this flag exists.
+    with closing(connect()) as conn, conn:
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key = 'credential_version'"
+        ).fetchone()
+        if row is None or row["value"] != "2":
+            conn.execute("DELETE FROM settings WHERE key = 'owner_password'")
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('credential_version', '2') "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+            )
+
 
 def session_secret() -> bytes:
     if not SECRET_PATH.exists():
