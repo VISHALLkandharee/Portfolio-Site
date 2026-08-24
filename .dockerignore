@@ -3,6 +3,8 @@ AGENTS.md
 .seeio-assets/
 .git/
 .venv/
+.testing/
+.tmpdata/
 __pycache__/
 *.pyc
 .gitignore

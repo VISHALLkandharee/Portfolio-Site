@@ -269,7 +269,7 @@
           '<span class="sent-tick" aria-hidden="true">✓</span>' +
           '<h3>Got it, ' + escapeHtml(sent.name.split(' ')[0] || 'thanks') + '</h3>' +
           '<p>Your message is saved in my inbox and I have your address, ' +
-          escapeHtml(sent.email) + '. I reply to every serious enquiry, usually within one working day.</p>' +
+          escapeHtml(sent.email) + '. I reply to every message, usually within one working day.</p>' +
           '<p class="sent-sub">Want it in front of me right now? Send the same message straight to my phone or my email.</p>' +
           '<div class="sent-actions">' +
             '<a class="btn btn-primary" target="_blank" rel="noopener" href="https://wa.me/923000249930?text=' +
@@ -284,7 +284,7 @@
         // Announce through the existing live region, then move focus into the
         // panel so keyboard and screen-reader users land on the confirmation.
         status.className = 'form-status ok';
-        status.textContent = 'Message sent. ' + sent.name + ', your message reached Vishal.';
+        status.textContent = 'Message sent. ' + sent.name + ', your message reached me.';
         panel.setAttribute('tabindex', '-1');
         reveal(panel);
         try { panel.focus(); } catch (err) {}

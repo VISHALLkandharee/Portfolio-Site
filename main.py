@@ -373,7 +373,7 @@ def page(title: str, body: str) -> HTMLResponse:
 <meta name="robots" content="noindex,nofollow">
 <title>{html.escape(title)}</title>
 <link rel="stylesheet" href="/fonts.css?v=2">
-<link rel="stylesheet" href="/style.css?v=7">
+<link rel="stylesheet" href="/style.css?v=8">
 <style>
  body{{padding:40px 0}}
  .inbox{{max-width:860px;margin:0 auto;padding:0 24px}}

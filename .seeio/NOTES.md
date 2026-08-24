@@ -41,7 +41,7 @@ plus a working contact form. Homepage + three project case studies + 404.
 - Case study copy is grounded in the resume bullets and repo descriptions. No invented metrics.
 - No em dashes anywhere in visitor-facing copy.
 - Reveal animations only apply when JS is present (`html.js` class), so content is never hidden if a script fails.
-- Cache busting: /style.css?v=7, /app.js?v=7, /fonts.css?v=2. BUMP THE VERSION on every CSS/JS change, in every page that links them
+- Cache busting: /style.css?v=8, /app.js?v=8, /fonts.css?v=2. BUMP THE VERSION on every CSS/JS change, in every page that links them
   (index, 404, three case studies, and the inline inbox template in main.py).
 
 ## Incident, 2026-08-24: contact form looked unresponsive
@@ -75,6 +75,21 @@ Backend, frontend and content were audited before going live. Fixed:
 - Performance: Google Fonts replaced with two self-hosted variable font files (78 KB, one per family instead of
   four duplicate downloads of the same file). Scroll progress bar is rAF-throttled. Typing animation stops when
   off-screen or the tab is hidden.
+
+## Copy review, 2026-08-24
+- Removed claims a recruiter could challenge in an interview: "zero-latency" feed on SaaS Pulse (its stack has no
+  websocket layer), "fifteen stops" and "in seconds" on Route-Master, "second and third project" in the FAQ,
+  "Seventeen public repositories" (a number that decays).
+- Softened the reply promise to "usually within one working day" everywhere, and dropped "serious enquiry", since
+  nothing notifies the owner when a message arrives.
+- Habit Tracker has no live URL, so the projects intro now says five of the six are deployed live.
+- Fixed stack inconsistencies between the homepage cards and the case studies (Prisma, Express.js).
+- Added a 1200x630 social share image at /assets/og-image.png, generated from the site's own palette and fonts,
+  wired into og:image and twitter:card on all six pages. Regenerate it if the tagline changes.
+
+## Pre-launch checklist if the site moves to a custom domain
+The preview hostname is hard-coded in canonical tags, og:url, JSON-LD url, sitemap.xml and robots.txt.
+All of those must change together, or search engines will keep treating the preview host as canonical.
 
 ## Open questions
 - Professional photo (GitHub avatar is the default identicon, so the hero uses a "VK" monogram and a code card).
