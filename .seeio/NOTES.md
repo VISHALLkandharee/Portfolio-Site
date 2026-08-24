@@ -34,11 +34,24 @@ plus a working contact form. Homepage + three project case studies + 404.
 - Case study copy is grounded in the resume bullets and repo descriptions. No invented metrics.
 - No em dashes anywhere in visitor-facing copy.
 - Reveal animations only apply when JS is present (`html.js` class), so content is never hidden if a script fails.
-- Cache busting: /style.css?v=3 and /app.js?v=3. BUMP THE VERSION on every CSS/JS change, in every page that links them
+- Cache busting: /style.css?v=4 and /app.js?v=4. BUMP THE VERSION on every CSS/JS change, in every page that links them
   (index, 404, three case studies, and the inline inbox template in main.py).
+
+## Incident, 2026-08-24: contact form looked unresponsive
+- Cause: app.js changed without bumping its ?v= query, so returning visitors ran a cached older script.
+  That script sent no fetch marker, the server answered a plain form POST with a 303 to /thanks.html,
+  the script could not parse the HTML and showed nothing useful.
+- Fixes: assets bumped to v=4; the server now recognises a background request from several signals
+  (X-Requested-With, Accept, Sec-Fetch-Dest, Sec-Fetch-Mode), so even an outdated script gets JSON;
+  the client treats any successful response as delivered even if the body is not JSON.
+- Also added: a success panel that replaces the form, scrolls into view and offers one-tap
+  "send it on WhatsApp / by email too" handoff so a visitor can reach Vishal instantly.
+- LESSON: bump ?v= in the SAME commit as any CSS/JS change, in all five pages and in main.py.
 
 ## Open questions
 - Professional photo (GitHub avatar is the default identicon, so the hero uses a "VK" monogram and a code card).
 - Screenshots of Task-Flow, Route-Master and SaaS Pulse for the case studies.
 - Client testimonials to add (no testimonials section on the page yet).
+- Email notification for new contact messages: would need SMTP or an API key, which cannot live in this
+  repo. Owner reads messages at /inbox for now, and visitors can hand off to WhatsApp or email in one tap.
 - Confirm the case study wording is accurate before sending it to recruiters.

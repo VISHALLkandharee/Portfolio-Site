@@ -297,6 +297,20 @@ section{padding:88px 0;position:relative}
 .form-status{display:none;margin-top:14px;padding:14px 16px;border-radius:12px;font-size:.93rem}
 .form-status.ok{display:block;background:var(--glow);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);color:var(--text)}
 .form-status.bad{display:block;background:rgba(255,139,139,.1);border:1px solid rgba(255,139,139,.4);color:var(--text)}
+.sent-panel{
+  border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));border-radius:var(--radius);
+  background:var(--surface);padding:30px;margin-top:26px;box-shadow:0 0 0 4px var(--glow);
+}
+.sent-tick{
+  display:grid;place-items:center;width:46px;height:46px;border-radius:14px;margin-bottom:16px;
+  background:linear-gradient(140deg,var(--accent),var(--accent-2));color:var(--accent-ink);
+  font-size:1.4rem;font-weight:700;
+}
+.sent-panel h3{font-size:1.35rem;margin-bottom:10px}
+.sent-panel p{font-size:.97rem}
+.sent-panel p.sent-sub{margin-top:14px;color:var(--text-dim)}
+.sent-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+
 .contact-list{list-style:none}
 .contact-list li{padding:15px 0;border-bottom:1px solid var(--line)}
 .contact-list li:last-child{border-bottom:0}

@@ -179,32 +179,106 @@
       submit.disabled = true;
       submit.textContent = 'Sending…';
 
-      fetch('/api/contact', { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'fetch' } })
-        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
-        .then(function (res) {
-          if (res.ok && res.data.ok) {
+      var values = {
+        name: (form.querySelector('[name="name"]') || {}).value || '',
+        email: (form.querySelector('[name="email"]') || {}).value || '',
+        subject: (form.querySelector('[name="subject"]') || {}).value || '',
+        message: (form.querySelector('[name="message"]') || {}).value || ''
+      };
+
+      function reveal(el) {
+        if (el.scrollIntoView) {
+          try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+          catch (err) { el.scrollIntoView(); }
+        }
+      }
+
+      function fail(text) {
+        status.className = 'form-status bad';
+        status.textContent = text;
+        reveal(status);
+      }
+
+      function showSuccess(sent) {
+        var handoff =
+          'Hi Vishal, I just sent this through your website.\n\n' +
+          'Name: ' + sent.name + '\n' +
+          'Email: ' + sent.email + '\n' +
+          'About: ' + sent.subject + '\n\n' + sent.message;
+        var panel = document.createElement('div');
+        panel.className = 'sent-panel';
+        panel.setAttribute('role', 'status');
+        panel.innerHTML =
+          '<span class="sent-tick" aria-hidden="true">✓</span>' +
+          '<h3>Got it, ' + escapeHtml(sent.name.split(' ')[0] || 'thanks') + '</h3>' +
+          '<p>Your message is saved in my inbox and I have your address, ' +
+          escapeHtml(sent.email) + '. I reply to every serious enquiry, usually within one working day.</p>' +
+          '<p class="sent-sub">Want it in front of me right now? Send the same message straight to my phone or my email.</p>' +
+          '<div class="sent-actions">' +
+            '<a class="btn btn-primary" target="_blank" rel="noopener" href="https://wa.me/923000249930?text=' +
+              encodeURIComponent(handoff) + '">Also send on WhatsApp</a>' +
+            '<a class="btn btn-ghost" href="mailto:vishall.kandharee@gmail.com?subject=' +
+              encodeURIComponent(sent.subject || 'Enquiry from your website') + '&body=' +
+              encodeURIComponent(handoff) + '">Also send by email</a>' +
+            '<button class="btn btn-ghost" type="button" data-again>Write another message</button>' +
+          '</div>';
+        form.style.display = 'none';
+        status.className = 'form-status';
+        status.textContent = '';
+        form.parentNode.insertBefore(panel, form.nextSibling);
+        reveal(panel);
+        var again = panel.querySelector('[data-again]');
+        if (again) {
+          again.addEventListener('click', function () {
+            panel.parentNode.removeChild(panel);
             form.reset();
-            status.className = 'form-status ok';
-            status.textContent = 'Thank you, your message reached me. I reply to every serious enquiry, usually within one working day.';
+            form.style.display = '';
+            reveal(form);
+          });
+        }
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (ch) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+        });
+      }
+
+      fetch('/api/contact', {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'X-Requested-With': 'fetch', 'Accept': 'application/json' }
+      })
+        .then(function (r) {
+          return r.text().then(function (text) {
+            var data = null;
+            try { data = JSON.parse(text); } catch (e) { data = null; }
+            return { ok: r.ok, data: data };
+          });
+        })
+        .then(function (res) {
+          // No body, or a body we cannot parse, still counts as delivered
+          // when the server answered with a success status.
+          var delivered = res.ok && (!res.data || res.data.ok !== false);
+          if (delivered) {
+            showSuccess(values);
           } else if (res.data && res.data.errors) {
             Object.keys(res.data.errors).forEach(function (key) {
               var field = form.querySelector('[name="' + key + '"]');
-              if (field && field.closest('.field')) {
-                field.closest('.field').classList.add('invalid');
-                var err = field.closest('.field').querySelector('.err');
+              var wrap = field && field.closest ? field.closest('.field') : null;
+              if (wrap) {
+                wrap.classList.add('invalid');
+                var err = wrap.querySelector('.err');
                 if (err) err.textContent = res.data.errors[key];
               }
             });
-            status.className = 'form-status bad';
-            status.textContent = 'Please check the highlighted fields.';
+            fail('Please check the highlighted fields and send again.');
           } else {
-            status.className = 'form-status bad';
-            status.textContent = (res.data && res.data.error) || 'Something went wrong. Please email vishall.kandharee@gmail.com directly.';
+            fail((res.data && res.data.error) || 'Something went wrong at my end. Please email vishall.kandharee@gmail.com directly.');
           }
         })
         .catch(function () {
-          status.className = 'form-status bad';
-          status.textContent = 'Network error. Please email vishall.kandharee@gmail.com directly.';
+          fail('Your connection dropped before the message was sent. Please email vishall.kandharee@gmail.com or message +92 300 0249930 on WhatsApp.');
         })
         .then(function () {
           submit.disabled = false;

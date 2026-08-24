@@ -203,7 +203,16 @@ async def contact(
     message: str = Form(""),
     website: str = Form(""),  # honeypot: real people leave it empty
 ) -> Response:
-    wants_json = request.headers.get("x-requested-with", "").lower() == "fetch"
+    # A browser labels its own requests: a normal form navigation is
+    # sec-fetch-dest=document, while fetch()/XHR is dest=empty, mode=cors.
+    # Checking several signals means an outdated cached script still gets
+    # JSON back rather than a redirect it cannot parse.
+    wants_json = (
+        request.headers.get("x-requested-with", "").lower() in {"fetch", "xmlhttprequest"}
+        or "application/json" in request.headers.get("accept", "").lower()
+        or request.headers.get("sec-fetch-dest", "").lower() == "empty"
+        or request.headers.get("sec-fetch-mode", "").lower() == "cors"
+    )
 
     def reply(payload: dict, status_code: int = 200) -> Response:
         """JSON for the fetch path, a readable page when JavaScript is off."""
@@ -275,7 +284,7 @@ def page(title: str, body: str) -> HTMLResponse:
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>{html.escape(title)}</title>
-<link rel="stylesheet" href="/style.css?v=3">
+<link rel="stylesheet" href="/style.css?v=4">
 <style>
  body{{padding:40px 0}}
  .inbox{{max-width:860px;margin:0 auto;padding:0 24px}}
