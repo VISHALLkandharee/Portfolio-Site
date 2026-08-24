@@ -49,6 +49,16 @@ MAX_NAME = 120
 MAX_EMAIL = 160
 MAX_SUBJECT = 160
 MAX_MESSAGE = 4000
+# The owner password is set at build time and only its PBKDF2 hash is stored
+# here, so the repository holds no usable secret. The owner can replace it from
+# inside the inbox, which writes a new hash to /data and takes precedence.
+BOOTSTRAP_PASSWORD_HASH = "6fd7ef3cc6885730c6804319a1c762df$96285c0c15c1ec47d4e4d10a74a9a45fc27a5565eedd476fb22e45b836c8fe5e"
+
+LOGIN_WINDOW = 900
+LOGIN_MAX_ATTEMPTS = 10
+GLOBAL_RATE_MAX = 120     # total contact messages accepted per window
+MAX_STORED_MESSAGES = 5000
+
 RATE_LIMIT_WINDOW = 3600
 RATE_LIMIT_MAX = 8          # per visitor IP, when the proxy identifies it
 RATE_LIMIT_MAX_SHARED = 60  # fallback when every request looks like one IP
@@ -62,7 +72,6 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s.]+\.[^@\s]+$")
 def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
     return conn
 
 
@@ -70,6 +79,10 @@ def init_db() -> None:
     """First-boot initialization: /data may be empty or absent here."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with closing(connect()) as conn, conn:
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.Error:
+            pass  # a read-only volume still allows reads in the default mode
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS messages (
@@ -121,6 +134,15 @@ def set_setting(key: str, value: str) -> None:
 # --------------------------------------------------------------------------
 # owner auth for /inbox
 # --------------------------------------------------------------------------
+def owner_hash() -> str:
+    """The password set from inside the inbox wins; otherwise the build-time one."""
+    try:
+        stored = get_setting("owner_password")
+    except sqlite3.Error:
+        stored = None
+    return stored or BOOTSTRAP_PASSWORD_HASH
+
+
 def hash_password(password: str, salt: str | None = None) -> str:
     salt = salt or secrets.token_hex(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 200_000)
@@ -184,9 +206,17 @@ def client_ip_hash(request: Request) -> tuple[str, int]:
 # --------------------------------------------------------------------------
 # app
 # --------------------------------------------------------------------------
+DB_READY = True
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ANN201 - FastAPI lifespan signature
-    init_db()
+    global DB_READY
+    try:
+        init_db()
+    except Exception as exc:  # noqa: BLE001 - never block startup on storage
+        DB_READY = False
+        print(f"[startup] database unavailable, serving the site read-only: {exc!r}")
     yield
 
 
@@ -211,7 +241,7 @@ def healthz() -> dict[str, bool]:
 
 
 @app.post("/api/contact")
-async def contact(
+def contact(
     request: Request,
     name: str = Form(""),
     email: str = Form(""),
@@ -272,21 +302,46 @@ async def contact(
         return reply({"ok": False, "errors": errors}, status_code=422)
 
     ip_hash, rate_max = client_ip_hash(request)
-    cutoff = int(time.time()) - RATE_LIMIT_WINDOW
-    with closing(connect()) as conn, conn:
-        (recent,) = conn.execute(
-            "SELECT COUNT(*) FROM messages WHERE ip_hash = ? "
-            "AND strftime('%s', ts) > ?",
-            (ip_hash, str(cutoff)),
-        ).fetchone()
-        if recent >= rate_max:
-            return reply(
-                {"ok": False, "error": "Too many messages just now. Please email me directly."},
-                status_code=429,
+    cutoff = str(int(time.time()) - RATE_LIMIT_WINDOW)
+    busy = "Too many messages just now. Please email vishall.kandharee@gmail.com directly."
+    try:
+        with closing(connect()) as conn, conn:
+            (recent,) = conn.execute(
+                "SELECT COUNT(*) FROM messages WHERE ip_hash = ? AND strftime('%s', ts) > ?",
+                (ip_hash, cutoff),
+            ).fetchone()
+            if recent >= rate_max:
+                return reply({"ok": False, "error": busy}, status_code=429)
+
+            # A spoofed X-Forwarded-For gives an attacker a fresh per-IP bucket
+            # every request, so an absolute ceiling backs the per-sender one up.
+            (window_total,) = conn.execute(
+                "SELECT COUNT(*) FROM messages WHERE strftime('%s', ts) > ?", (cutoff,)
+            ).fetchone()
+            if window_total >= GLOBAL_RATE_MAX:
+                return reply({"ok": False, "error": busy}, status_code=429)
+
+            # Never let the table grow without bound on the persistent volume.
+            (stored,) = conn.execute("SELECT COUNT(*) FROM messages").fetchone()
+            if stored >= MAX_STORED_MESSAGES:
+                conn.execute(
+                    "DELETE FROM messages WHERE id IN ("
+                    "  SELECT id FROM messages WHERE read = 1 ORDER BY id ASC LIMIT 100)"
+                )
+                (stored,) = conn.execute("SELECT COUNT(*) FROM messages").fetchone()
+                if stored >= MAX_STORED_MESSAGES:
+                    return reply({"ok": False, "error": busy}, status_code=429)
+
+            conn.execute(
+                "INSERT INTO messages (name, email, subject, body, ip_hash) VALUES (?, ?, ?, ?, ?)",
+                (name, email, subject, message, ip_hash),
             )
-        conn.execute(
-            "INSERT INTO messages (name, email, subject, body, ip_hash) VALUES (?, ?, ?, ?, ?)",
-            (name, email, subject, message, ip_hash),
+    except sqlite3.Error as exc:
+        print(f"[contact] storage failure: {exc!r}")
+        return reply(
+            {"ok": False, "error": "I could not save that just now. Please email "
+                                   "vishall.kandharee@gmail.com or message +92 300 0249930 on WhatsApp."},
+            status_code=503,
         )
     return reply({"ok": True})
 
@@ -300,8 +355,8 @@ def page(title: str, body: str) -> HTMLResponse:
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>{html.escape(title)}</title>
-<link rel="stylesheet" href="/fonts.css?v=1">
-<link rel="stylesheet" href="/style.css?v=6">
+<link rel="stylesheet" href="/fonts.css?v=2">
+<link rel="stylesheet" href="/style.css?v=7">
 <style>
  body{{padding:40px 0}}
  .inbox{{max-width:860px;margin:0 auto;padding:0 24px}}
@@ -319,38 +374,95 @@ def page(title: str, body: str) -> HTMLResponse:
     )
 
 
+def sign_in(response: Response) -> None:
+    """Signed session cookie, plus a plain marker the site itself can read."""
+    response.set_cookie(
+        SESSION_COOKIE, make_session(), httponly=True, secure=True,
+        samesite="lax", max_age=SESSION_TTL, path="/",
+    )
+    response.set_cookie(
+        OWNER_MARKER, "1", secure=True, samesite="lax", max_age=SESSION_TTL, path="/"
+    )
+
+
+@app.get("/api/inbox/unread")
+def unread_count(request: Request) -> JSONResponse:
+    """Feeds the owner badge on the public pages. Requires a real session."""
+    if not valid_session(request.cookies.get(SESSION_COOKIE)):
+        return JSONResponse({"signedIn": False, "unread": 0}, status_code=401)
+    try:
+        with closing(connect()) as conn:
+            (unread,) = conn.execute("SELECT COUNT(*) FROM messages WHERE read = 0").fetchone()
+    except sqlite3.Error:
+        return JSONResponse({"signedIn": True, "unread": 0})
+    return JSONResponse({"signedIn": True, "unread": int(unread)})
+
+
+def csrf_token(session: str) -> str:
+    """Per-session token, so an inbox action cannot be triggered cross-site."""
+    return hmac.new(session_secret(), f"csrf.{session}".encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def csrf_ok(request: Request, submitted: str) -> bool:
+    session = request.cookies.get(SESSION_COOKIE) or ""
+    return bool(submitted) and hmac.compare_digest(submitted, csrf_token(session))
+
+
+def login_allowed(bucket: str) -> bool:
+    """Throttle password guessing, which is also expensive to verify."""
+    now = time.time()
+    attempts = [t for t in LOGIN_ATTEMPTS.get(bucket, []) if now - t < LOGIN_WINDOW]
+    LOGIN_ATTEMPTS[bucket] = attempts
+    if len(LOGIN_ATTEMPTS) > 5000:  # keep the table from growing without bound
+        LOGIN_ATTEMPTS.clear()
+    return len(attempts) < LOGIN_MAX_ATTEMPTS
+
+
+def login_seen(bucket: str) -> None:
+    LOGIN_ATTEMPTS.setdefault(bucket, []).append(time.time())
+
+
+LOGIN_ATTEMPTS: dict[str, list[float]] = {}
+
+
+def login_page(note: str = "") -> HTMLResponse:
+    warning = f'<p class="note" style="color:#ff8b8b">{html.escape(note)}</p>' if note else ""
+    return page(
+        "Inbox",
+        f"""<div class="inbox">
+<h1 style="font-size:1.9rem">Inbox</h1>
+<p class="note">Messages sent through the contact form on the site.</p>
+{warning}
+<form method="post" action="/inbox/login">
+  <input type="password" name="password" placeholder="Password" required autofocus autocomplete="current-password">
+  <button class="btn btn-primary" type="submit">Sign in</button>
+</form>
+<p class="note" style="margin-top:22px"><a href="/" style="color:var(--accent)">Back to the site</a></p></div>""",
+    )
+
+
 @app.get("/inbox", response_class=HTMLResponse)
 def inbox(request: Request) -> HTMLResponse:
-    stored = get_setting("owner_password")
-    if not stored:
-        return page(
-            "Set up inbox",
-            """<div class="inbox">
-<h1 style="font-size:1.9rem">Set your inbox password</h1>
-<p class="note">This is the first visit to the inbox, so choose the password now.
-Contact form messages are kept here.</p>
-<form method="post" action="/inbox/setup">
-  <input type="password" name="password" placeholder="New password (10 characters or more)" minlength="10" required>
-  <input type="password" name="confirm" placeholder="Repeat the password" minlength="10" required>
-  <button class="btn btn-primary" type="submit">Save password</button>
-</form></div>""",
-        )
-    if not valid_session(request.cookies.get(SESSION_COOKIE)):
+    session = request.cookies.get(SESSION_COOKIE)
+    if not valid_session(session):
+        return login_page()
+
+    token = csrf_token(session or "")
+    try:
+        with closing(connect()) as conn:
+            rows = conn.execute(
+                "SELECT id, ts, name, email, subject, body, read FROM messages "
+                "ORDER BY id DESC LIMIT 200"
+            ).fetchall()
+            (unread,) = conn.execute("SELECT COUNT(*) FROM messages WHERE read = 0").fetchone()
+    except sqlite3.Error as exc:
         return page(
             "Inbox",
-            """<div class="inbox">
-<h1 style="font-size:1.9rem">Inbox</h1>
-<form method="post" action="/inbox/login">
-  <input type="password" name="password" placeholder="Password" required autofocus>
-  <button class="btn btn-primary" type="submit">Sign in</button>
-</form></div>""",
+            f"""<div class="inbox"><h1 style="font-size:1.9rem">Inbox</h1>
+<p class="note">The message store is temporarily unavailable ({html.escape(type(exc).__name__)}).
+The rest of the site is unaffected. Try again shortly.</p>
+<p style="margin-top:20px"><a class="btn btn-ghost" href="/">Back to the site</a></p></div>""",
         )
-
-    with closing(connect()) as conn:
-        rows = conn.execute(
-            "SELECT id, ts, name, email, subject, body, read FROM messages ORDER BY id DESC LIMIT 200"
-        ).fetchall()
-        (unread,) = conn.execute("SELECT COUNT(*) FROM messages WHERE read = 0").fetchone()
 
     items = []
     for r in rows:
@@ -363,89 +475,122 @@ Contact form messages are kept here.</p>
   <p class="body">{html.escape(r['body'])}</p>
   <div class="row">
     <a class="btn btn-primary btn-sm" href="mailto:{quote(r['email'])}?subject={quote('Re: ' + raw_subject)}">Reply</a>
-    <form method="post" action="/inbox/read/{r['id']}"><button class="btn btn-ghost btn-sm" type="submit">
-      {'Mark unread' if r['read'] else 'Mark read'}</button></form>
-    <form method="post" action="/inbox/delete/{r['id']}"><button class="btn btn-ghost btn-sm" type="submit">Delete</button></form>
+    <form method="post" action="/inbox/read/{r['id']}"><input type="hidden" name="csrf" value="{token}">
+      <button class="btn btn-ghost btn-sm" type="submit">{'Mark unread' if r['read'] else 'Mark read'}</button></form>
+    <form method="post" action="/inbox/delete/{r['id']}"><input type="hidden" name="csrf" value="{token}">
+      <button class="btn btn-ghost btn-sm" type="submit">Delete</button></form>
   </div>
 </article>"""
         )
-    body = "".join(items) or '<p class="note">No messages yet.</p>'
+    body = "".join(items) or '<p class="note">No messages yet. Anything sent through the contact form lands here.</p>'
     return page(
         "Inbox",
         f"""<div class="inbox">
 <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
   <h1 style="font-size:1.9rem">Inbox <span class="accent">({unread} unread)</span></h1>
-  <div style="display:flex;gap:10px">
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
     <a class="btn btn-ghost btn-sm" href="/">Back to site</a>
-    <form method="post" action="/inbox/logout"><button class="btn btn-ghost btn-sm" type="submit">Sign out</button></form>
+    <a class="btn btn-ghost btn-sm" href="/inbox/password">Change password</a>
+    <form method="post" action="/inbox/logout"><input type="hidden" name="csrf" value="{token}">
+      <button class="btn btn-ghost btn-sm" type="submit">Sign out</button></form>
   </div>
 </div>{body}</div>""",
     )
 
 
-def sign_in(response: Response) -> None:
-    """Signed session cookie, plus a plain marker the site can read."""
-    response.set_cookie(
-        SESSION_COOKIE, make_session(), httponly=True, samesite="lax", max_age=SESSION_TTL, path="/"
-    )
-    response.set_cookie(OWNER_MARKER, "1", samesite="lax", max_age=SESSION_TTL, path="/")
-
-
-@app.get("/api/inbox/unread")
-def unread_count(request: Request) -> JSONResponse:
-    """Feeds the owner badge on the public pages. Requires a real session."""
-    if not valid_session(request.cookies.get(SESSION_COOKIE)):
-        return JSONResponse({"signedIn": False, "unread": 0}, status_code=401)
-    with closing(connect()) as conn:
-        (unread,) = conn.execute("SELECT COUNT(*) FROM messages WHERE read = 0").fetchone()
-    return JSONResponse({"signedIn": True, "unread": int(unread)})
-
-
-@app.post("/inbox/setup")
-def inbox_setup(password: str = Form(""), confirm: str = Form("")) -> Response:
-    if get_setting("owner_password"):
-        return RedirectResponse("/inbox", status_code=303)
-    if len(password) < 10 or password != confirm:
-        return RedirectResponse("/inbox", status_code=303)
-    set_setting("owner_password", hash_password(password))
-    response = RedirectResponse("/inbox", status_code=303)
-    sign_in(response)
-    return response
-
-
 @app.post("/inbox/login")
-def inbox_login(password: str = Form("")) -> Response:
-    stored = get_setting("owner_password")
-    response = RedirectResponse("/inbox", status_code=303)
-    if stored and verify_password(password, stored):
+def inbox_login(request: Request, password: str = Form("")) -> Response:
+    bucket, _ = client_ip_hash(request)
+    if not login_allowed(bucket):
+        return login_page("Too many attempts. Wait a few minutes and try again.")
+    if verify_password(password, owner_hash()):
+        LOGIN_ATTEMPTS.pop(bucket, None)  # only failures count towards the throttle
+        response = RedirectResponse("/inbox", status_code=303)
         sign_in(response)
-    return response
+        return response
+    login_seen(bucket)
+    return login_page("That password is not right.")
+
+
+@app.get("/inbox/password", response_class=HTMLResponse)
+def password_form(request: Request) -> HTMLResponse:
+    session = request.cookies.get(SESSION_COOKIE)
+    if not valid_session(session):
+        return login_page()
+    return page(
+        "Change password",
+        f"""<div class="inbox">
+<h1 style="font-size:1.9rem">Change password</h1>
+<p class="note">The new password is stored as a hash on the persistent volume and replaces the one set at build time.</p>
+<form method="post" action="/inbox/password">
+  <input type="hidden" name="csrf" value="{csrf_token(session or '')}">
+  <input type="password" name="current" placeholder="Current password" required autocomplete="current-password">
+  <input type="password" name="password" placeholder="New password (10 characters or more)" minlength="10" required autocomplete="new-password">
+  <input type="password" name="confirm" placeholder="Repeat the new password" minlength="10" required autocomplete="new-password">
+  <button class="btn btn-primary" type="submit">Save new password</button>
+</form>
+<p class="note" style="margin-top:22px"><a href="/inbox" style="color:var(--accent)">Back to the inbox</a></p></div>""",
+    )
+
+
+@app.post("/inbox/password")
+def password_change(
+    request: Request,
+    current: str = Form(""),
+    password: str = Form(""),
+    confirm: str = Form(""),
+    csrf: str = Form(""),
+) -> Response:
+    session = request.cookies.get(SESSION_COOKIE)
+    if not valid_session(session) or not csrf_ok(request, csrf):
+        return login_page()
+    if not verify_password(current, owner_hash()):
+        return page("Change password", '<div class="inbox"><p class="note">The current password is not right. '
+                    '<a href="/inbox/password" style="color:var(--accent)">Try again</a>.</p></div>')
+    if len(password) < 10 or password != confirm:
+        return page("Change password", '<div class="inbox"><p class="note">The new passwords must match and be at '
+                    'least 10 characters. <a href="/inbox/password" style="color:var(--accent)">Try again</a>.</p></div>')
+    try:
+        set_setting("owner_password", hash_password(password))
+    except sqlite3.Error:
+        return page("Change password", '<div class="inbox"><p class="note">Could not save the new password just now. '
+                    'Please try again shortly.</p></div>')
+    return RedirectResponse("/inbox", status_code=303)
 
 
 @app.post("/inbox/logout")
-def inbox_logout() -> Response:
-    # Bumping the epoch retires every token already issued, so signing out
-    # is real even if a cookie was copied elsewhere.
-    set_setting("session_epoch", str(int(session_epoch()) + 1))
+def inbox_logout(request: Request, csrf: str = Form("")) -> Response:
     response = RedirectResponse("/inbox", status_code=303)
-    response.delete_cookie(SESSION_COOKIE, path="/")
-    response.delete_cookie(OWNER_MARKER, path="/")
+    if valid_session(request.cookies.get(SESSION_COOKIE)) and csrf_ok(request, csrf):
+        # Retiring the epoch invalidates every token already issued.
+        try:
+            set_setting("session_epoch", str(int(session_epoch()) + 1))
+        except sqlite3.Error:
+            pass
+        response.delete_cookie(SESSION_COOKIE, path="/")
+        response.delete_cookie(OWNER_MARKER, path="/")
     return response
 
 
 @app.post("/inbox/read/{message_id}")
-def inbox_read(message_id: int, request: Request) -> Response:
-    if valid_session(request.cookies.get(SESSION_COOKIE)):
-        with closing(connect()) as conn, conn:
-            conn.execute("UPDATE messages SET read = 1 - read WHERE id = ?", (message_id,))
+def inbox_read(message_id: int, request: Request, csrf: str = Form("")) -> Response:
+    if valid_session(request.cookies.get(SESSION_COOKIE)) and csrf_ok(request, csrf):
+        try:
+            with closing(connect()) as conn, conn:
+                conn.execute("UPDATE messages SET read = 1 - read WHERE id = ?", (message_id,))
+        except sqlite3.Error:
+            pass
     return RedirectResponse("/inbox", status_code=303)
 
 
 @app.post("/inbox/delete/{message_id}")
-def inbox_delete(message_id: int, request: Request) -> Response:
-    if valid_session(request.cookies.get(SESSION_COOKIE)):
-        with closing(connect()) as conn, conn:
-            conn.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+def inbox_delete(message_id: int, request: Request, csrf: str = Form("")) -> Response:
+    if valid_session(request.cookies.get(SESSION_COOKIE)) and csrf_ok(request, csrf):
+        try:
+            with closing(connect()) as conn, conn:
+                conn.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+        except sqlite3.Error:
+            pass
     return RedirectResponse("/inbox", status_code=303)
 
 

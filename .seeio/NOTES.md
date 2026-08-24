@@ -18,6 +18,9 @@ plus a working contact form. Homepage + three project case studies + 404.
 ## Architecture
 - `main.py` (FastAPI) + `public/` static files. Healthcheck: /healthz.
 - Contact form POSTs to /api/contact, stored in SQLite at /data/app.db (created on first boot, /data is the only persistent path).
+- OWNER LOGIN: the password is set at build time; only its PBKDF2 hash lives in main.py (BOOTSTRAP_PASSWORD_HASH).
+  There is no self-service "claim the inbox" flow any more (it was a takeover risk once the footer linked /inbox).
+  The owner can change the password from inside the inbox, which stores a new hash in /data and takes precedence.
 - Owner inbox at /inbox, reachable from the "Inbox" link in the footer of every page (rel=nofollow, noindex,
   disallowed in robots.txt). Once signed in, a floating "Inbox (n)" badge appears on the public pages; it is driven by a
   readable `vk_owner` marker cookie plus GET /api/inbox/unread, which requires a real session, so the marker grants nothing.
@@ -38,7 +41,7 @@ plus a working contact form. Homepage + three project case studies + 404.
 - Case study copy is grounded in the resume bullets and repo descriptions. No invented metrics.
 - No em dashes anywhere in visitor-facing copy.
 - Reveal animations only apply when JS is present (`html.js` class), so content is never hidden if a script fails.
-- Cache busting: /style.css?v=5 and /app.js?v=5. BUMP THE VERSION on every CSS/JS change, in every page that links them
+- Cache busting: /style.css?v=7, /app.js?v=7, /fonts.css?v=2. BUMP THE VERSION on every CSS/JS change, in every page that links them
   (index, 404, three case studies, and the inline inbox template in main.py).
 
 ## Incident, 2026-08-24: contact form looked unresponsive
@@ -51,6 +54,27 @@ plus a working contact form. Homepage + three project case studies + 404.
 - Also added: a success panel that replaces the form, scrolls into view and offers one-tap
   "send it on WhatsApp / by email too" handoff so a visitor can reach Vishal instantly.
 - LESSON: bump ?v= in the SAME commit as any CSS/JS change, in all five pages and in main.py.
+
+## Pre-launch audit, 2026-08-24
+Backend, frontend and content were audited before going live. Fixed:
+- CRITICAL: anyone could claim the unset inbox password. Replaced with a build-time credential.
+- HIGH: unauthenticated POST /inbox/logout could sign the owner out repeatedly. Now needs a session and a CSRF token.
+- HIGH: a corrupt or read-only /data killed startup, so the whole static site went down. Storage failures are now
+  contained: the site and /healthz stay up and the form returns a helpful 503 with direct contact details.
+- HIGH: rate limiting trusted a spoofable X-Forwarded-For. Added a global per-window ceiling and a stored-message cap.
+- HIGH: light theme accent (#0d9488) failed WCAG AA at 3.74:1. Now #0f766e (5.47:1). Error red now uses --danger.
+- MEDIUM: contact route ran blocking SQLite on the event loop; it is a sync def now, so it runs in the threadpool.
+- MEDIUM: unlimited inbox login attempts, each costing ~180ms of PBKDF2. Throttled to 10 failures per 15 minutes.
+- MEDIUM: no Cache-Control header meant browsers served stale pages and never saw updates. HTML now revalidates,
+  versioned assets cache for a week, fonts for a year, inbox and API responses are no-store.
+- MEDIUM: a failed app.js load left every section invisible. The head script now removes the `js` class after 2.5s
+  if app.js has not run.
+- Session cookies now carry Secure; sign-out retires all issued tokens via a session epoch.
+- Accessibility: skip link on every page, visible focus rings, aria-invalid and aria-describedby on form fields,
+  focus moved into the success panel, Escape closes the mobile nav, thanks.html has a real h1.
+- Performance: Google Fonts replaced with two self-hosted variable font files (78 KB, one per family instead of
+  four duplicate downloads of the same file). Scroll progress bar is rAF-throttled. Typing animation stops when
+  off-screen or the tab is hidden.
 
 ## Open questions
 - Professional photo (GitHub avatar is the default identicon, so the hero uses a "VK" monogram and a code card).

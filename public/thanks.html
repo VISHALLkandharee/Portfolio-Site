@@ -6,19 +6,21 @@
 <title>Message sent | Vishal Kumar</title>
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#080b10">
-<link rel="preload" href="/assets/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/fonts.css?v=1">
-<link rel="stylesheet" href="/style.css?v=6">
+<link rel="preload" href="/assets/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/fonts.css?v=2">
+<link rel="stylesheet" href="/style.css?v=7">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%232dd4bf'/><text x='50' y='68' font-size='42' font-family='Helvetica,Arial,sans-serif' font-weight='bold' fill='%23042220' text-anchor='middle'>VK</text></svg>">
 <script>
   (function(){try{var t=localStorage.getItem('vk-theme');
   if(!t)t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){}
-  document.documentElement.classList.add('js');})();
+  var d=document.documentElement;d.classList.add('js');
+  setTimeout(function(){if(!window.__vkReady)d.classList.remove('js');},2500);})();
 </script>
 
 </head>
 <body id="top">
+<a class="skip" href="#main">Skip to content</a>
 <div class="ambient" aria-hidden="true"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
 <div class="grid-bg" aria-hidden="true"></div>
 
@@ -41,11 +43,11 @@
   </div>
 </header>
 
-<main>
+<main id="main">
   <div class="wrap oops">
     <div>
       <p class="kicker">Message received</p>
-      <h2 style="font-size:clamp(2rem,5vw,3rem);margin-top:12px">Thank you, that reached me</h2>
+      <h1 style="font-size:clamp(2rem,5vw,3rem);margin-top:12px">Thank you, that reached me</h1>
       <p style="margin-top:14px;max-width:46ch;margin-inline:auto">Your message is in my inbox. I reply to every serious enquiry, usually within one working day. If it is urgent, WhatsApp me on +92 300 0249930.</p>
       <div class="hero-actions" style="justify-content:center">
         <a class="btn btn-primary" href="/">Back to the homepage</a>
@@ -78,7 +80,7 @@
     </div>
   </div>
 </footer>
-<script src="/app.js?v=6"></script>
+<script src="/app.js?v=7"></script>
 
 </body>
 </html>

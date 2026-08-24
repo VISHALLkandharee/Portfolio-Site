@@ -13,15 +13,16 @@
 <meta property="og:description" content="Six production applications shipped end to end: multi-tenant SaaS with Stripe billing, real-time sync, job queues and AI-powered route optimisation.">
 <meta property="og:url" content="https://mellow-pebble-31.s1.seeiousercontent.com/">
 <meta name="twitter:card" content="summary">
-<link rel="preload" href="/assets/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/fonts.css?v=1">
-<link rel="stylesheet" href="/style.css?v=6">
+<link rel="preload" href="/assets/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/fonts.css?v=2">
+<link rel="stylesheet" href="/style.css?v=7">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%232dd4bf'/><text x='50' y='68' font-size='42' font-family='Helvetica,Arial,sans-serif' font-weight='bold' fill='%23042220' text-anchor='middle'>VK</text></svg>">
 <script>
   (function(){try{var t=localStorage.getItem('vk-theme');
   if(!t)t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){}
-  document.documentElement.classList.add('js');})();
+  var d=document.documentElement;d.classList.add('js');
+  setTimeout(function(){if(!window.__vkReady)d.classList.remove('js');},2500);})();
 </script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Person","name":"Vishal Kumar","jobTitle":"Full Stack Developer",
@@ -34,6 +35,7 @@
 </script>
 </head>
 <body id="top">
+<a class="skip" href="#main">Skip to content</a>
 <div class="ambient" aria-hidden="true"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
 <div class="grid-bg" aria-hidden="true"></div>
 
@@ -56,7 +58,7 @@
   </div>
 </header>
 
-<main>
+<main id="main">
 
   <section class="hero">
     <div class="wrap hero-grid">
@@ -357,16 +359,16 @@
         <h2>Let's build something</h2>
         <p style="margin-top:16px;max-width:50ch">Tell me what you are building and what you need. Every message lands straight in my inbox and I reply to serious enquiries within one working day.</p>
 
-        <form class="form-grid" id="contact-form" style="margin-top:26px" action="/api/contact" method="post" novalidate>
+        <form class="form-grid" id="contact-form" style="margin-top:26px" action="/api/contact" method="post">
           <div class="field">
             <label for="f-name">Your name</label>
-            <input id="f-name" name="name" type="text" autocomplete="name" maxlength="120" required>
-            <span class="err"></span>
+            <input id="f-name" name="name" aria-describedby="f-name-err" type="text" autocomplete="name" maxlength="120" required>
+            <span class="err" id="f-name-err"></span>
           </div>
           <div class="field">
             <label for="f-email">Email</label>
-            <input id="f-email" name="email" type="email" autocomplete="email" maxlength="160" required>
-            <span class="err"></span>
+            <input id="f-email" name="email" aria-describedby="f-email-err" type="email" autocomplete="email" maxlength="160" required>
+            <span class="err" id="f-email-err"></span>
           </div>
           <div class="field">
             <label for="f-subject">What is it about</label>
@@ -379,8 +381,8 @@
           </div>
           <div class="field">
             <label for="f-message">Message</label>
-            <textarea id="f-message" name="message" maxlength="4000" required placeholder="A sentence or two about the project, the timeline and the budget range if you have one."></textarea>
-            <span class="err"></span>
+            <textarea id="f-message" name="message" aria-describedby="f-message-err" maxlength="4000" required placeholder="A sentence or two about the project, the timeline and the budget range if you have one."></textarea>
+            <span class="err" id="f-message-err"></span>
           </div>
           <div class="hp" aria-hidden="true"><label for="f-website">Leave this empty</label><input id="f-website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
           <button class="btn btn-primary" type="submit">Send message</button>
@@ -428,7 +430,7 @@
     </div>
   </div>
 </footer>
-<script src="/app.js?v=6"></script>
+<script src="/app.js?v=7"></script>
 
 </body>
 </html>

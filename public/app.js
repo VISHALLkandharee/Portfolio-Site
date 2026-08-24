@@ -1,6 +1,7 @@
 /* Vishal Kumar portfolio, v3 */
 (function () {
   'use strict';
+  window.__vkReady = true;
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- theme ---------- */
@@ -26,16 +27,22 @@
   var toggle = document.querySelector('.nav-toggle');
   var nav = document.getElementById('nav');
   if (toggle && nav) {
-    toggle.addEventListener('click', function () {
-      var open = nav.classList.toggle('open');
+    var setNav = function (open) {
+      nav.classList.toggle('open', open);
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
       toggle.textContent = open ? '✕' : '☰';
+    };
+    toggle.addEventListener('click', function () {
+      setNav(!nav.classList.contains('open'));
     });
     nav.addEventListener('click', function (e) {
-      if (e.target.tagName === 'A') {
-        nav.classList.remove('open');
-        toggle.setAttribute('aria-expanded', 'false');
-        toggle.textContent = '☰';
+      if (e.target.tagName === 'A') setNav(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && nav.classList.contains('open')) {
+        setNav(false);
+        toggle.focus();
       }
     });
   }
@@ -43,13 +50,22 @@
   /* ---------- scroll progress ---------- */
   var bar = document.querySelector('.progress');
   if (bar) {
-    var tick = function () {
-      var h = document.documentElement.scrollHeight - window.innerHeight;
-      bar.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
+    var scrollable = 0, pending = false;
+    var measure = function () {
+      scrollable = document.documentElement.scrollHeight - window.innerHeight;
+      paint();
     };
-    window.addEventListener('scroll', tick, { passive: true });
-    window.addEventListener('resize', tick);
-    tick();
+    var paint = function () {
+      pending = false;
+      bar.style.width = (scrollable > 0 ? (window.scrollY / scrollable) * 100 : 0) + '%';
+    };
+    window.addEventListener('scroll', function () {
+      if (pending) return;
+      pending = true;
+      window.requestAnimationFrame(paint);
+    }, { passive: true });
+    window.addEventListener('resize', measure);
+    measure();
   }
 
   /* ---------- reveal on scroll ---------- */
@@ -61,6 +77,7 @@
       entries.forEach(function (entry) {
         if (entry.isIntersecting) {
           entry.target.classList.add('in');
+          entry.target.style.transitionDelay = '';
           ro.unobserve(entry.target);
         }
       });
@@ -95,15 +112,28 @@
       if (reduced) {
         out.textContent = phrases[0];
       } else {
-        var pi = 0, ci = 0, deleting = false;
+        var pi = 0, ci = 0, deleting = false, timer = null, visible = true, running = false;
         var run = function () {
+          running = true;
+          if (!visible || document.hidden) { running = false; return; }
           var word = phrases[pi];
           out.textContent = word.slice(0, ci);
-          if (!deleting && ci < word.length) { ci++; setTimeout(run, 55); }
-          else if (!deleting) { deleting = true; setTimeout(run, 1900); }
-          else if (ci > 0) { ci--; setTimeout(run, 26); }
-          else { deleting = false; pi = (pi + 1) % phrases.length; setTimeout(run, 300); }
+          if (!deleting && ci < word.length) { ci++; timer = setTimeout(run, 55); }
+          else if (!deleting) { deleting = true; timer = setTimeout(run, 1900); }
+          else if (ci > 0) { ci--; timer = setTimeout(run, 26); }
+          else { deleting = false; pi = (pi + 1) % phrases.length; timer = setTimeout(run, 300); }
         };
+        var resume = function () { if (!running && visible && !document.hidden) run(); };
+        var stop = function () { clearTimeout(timer); running = false; };
+        if ('IntersectionObserver' in window) {
+          new IntersectionObserver(function (entries) {
+            visible = entries[0].isIntersecting;
+            if (visible) resume(); else stop();
+          }).observe(typed);
+        }
+        document.addEventListener('visibilitychange', function () {
+          if (document.hidden) stop(); else resume();
+        });
         run();
       }
     }
@@ -147,12 +177,14 @@
 
   /* ---------- copy to clipboard ---------- */
   Array.prototype.forEach.call(document.querySelectorAll('[data-copy]'), function (btn) {
+    var label = btn.textContent;
+    var revert = null;
     btn.addEventListener('click', function () {
       var value = btn.getAttribute('data-copy');
       var done = function () {
-        var old = btn.textContent;
         btn.textContent = 'copied';
-        setTimeout(function () { btn.textContent = old; }, 1600);
+        clearTimeout(revert);
+        revert = setTimeout(function () { btn.textContent = label; }, 1600);
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(value).then(done, function () {});
@@ -172,9 +204,25 @@
     var submit = form.querySelector('button[type="submit"]');
     form.addEventListener('submit', function (e) {
       e.preventDefault();
-      Array.prototype.forEach.call(form.querySelectorAll('.field'), function (f) { f.classList.remove('invalid'); });
+      Array.prototype.forEach.call(form.querySelectorAll('.field'), function (f) {
+        f.classList.remove('invalid');
+        var input = f.querySelector('input,textarea,select');
+        if (input) input.removeAttribute('aria-invalid');
+      });
       status.className = 'form-status';
       status.textContent = '';
+
+      // Catch the obvious problems here, so an empty form never costs a round trip.
+      if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+        var firstBad = form.querySelector(':invalid');
+        if (firstBad) {
+          markInvalid(firstBad, firstBad.validationMessage || 'Please complete this field.');
+          firstBad.focus();
+        }
+        status.className = 'form-status bad';
+        status.textContent = 'Please complete the highlighted fields.';
+        return;
+      }
       var label = submit.textContent;
       submit.disabled = true;
       submit.textContent = 'Sending…';
@@ -185,6 +233,15 @@
         subject: (form.querySelector('[name="subject"]') || {}).value || '',
         message: (form.querySelector('[name="message"]') || {}).value || ''
       };
+
+      function markInvalid(input, text) {
+        var wrap = input.closest ? input.closest('.field') : null;
+        if (!wrap) return;
+        wrap.classList.add('invalid');
+        input.setAttribute('aria-invalid', 'true');
+        var err = wrap.querySelector('.err');
+        if (err) err.textContent = text;
+      }
 
       function reveal(el) {
         if (el.scrollIntoView) {
@@ -223,17 +280,25 @@
             '<button class="btn btn-ghost" type="button" data-again>Write another message</button>' +
           '</div>';
         form.style.display = 'none';
-        status.className = 'form-status';
-        status.textContent = '';
         form.parentNode.insertBefore(panel, form.nextSibling);
+        // Announce through the existing live region, then move focus into the
+        // panel so keyboard and screen-reader users land on the confirmation.
+        status.className = 'form-status ok';
+        status.textContent = 'Message sent. ' + sent.name + ', your message reached Vishal.';
+        panel.setAttribute('tabindex', '-1');
         reveal(panel);
+        try { panel.focus(); } catch (err) {}
         var again = panel.querySelector('[data-again]');
         if (again) {
           again.addEventListener('click', function () {
             panel.parentNode.removeChild(panel);
             form.reset();
             form.style.display = '';
+            status.className = 'form-status';
+            status.textContent = '';
             reveal(form);
+            var first = form.querySelector('input');
+            if (first) first.focus();
           });
         }
       }
@@ -263,15 +328,14 @@
           if (delivered) {
             showSuccess(values);
           } else if (res.data && res.data.errors) {
+            var firstField = null;
             Object.keys(res.data.errors).forEach(function (key) {
               var field = form.querySelector('[name="' + key + '"]');
-              var wrap = field && field.closest ? field.closest('.field') : null;
-              if (wrap) {
-                wrap.classList.add('invalid');
-                var err = wrap.querySelector('.err');
-                if (err) err.textContent = res.data.errors[key];
-              }
+              if (!field) return;
+              markInvalid(field, res.data.errors[key]);
+              if (!firstField) firstField = field;
             });
+            if (firstField) firstField.focus();
             fail('Please check the highlighted fields and send again.');
           } else {
             fail((res.data && res.data.error) || 'Something went wrong at my end. Please email vishall.kandharee@gmail.com directly.');
