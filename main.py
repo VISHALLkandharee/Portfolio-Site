@@ -230,6 +230,23 @@ async def security_headers(request: Request, call_next):  # noqa: ANN001
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    # Everything the site needs comes from this origin. The inline theme script
+    # and the inline styles in the markup need 'unsafe-inline'; no third party
+    # script can run, which is the attack this actually blocks.
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "form-action 'self'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'self'",
+    )
     if request.url.path.startswith(("/inbox", "/api/")):
         response.headers["Cache-Control"] = "no-store"
     return response
