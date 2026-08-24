@@ -41,6 +41,7 @@ DB_PATH = DATA_DIR / "app.db"
 SECRET_PATH = DATA_DIR / "session.key"
 
 SESSION_COOKIE = "vk_inbox"
+OWNER_MARKER = "vk_owner"   # readable by the page, grants nothing on its own
 SESSION_TTL = 60 * 60 * 12  # 12 hours
 
 MAX_NAME = 120
@@ -133,18 +134,30 @@ def verify_password(password: str, stored: str) -> bool:
     return hmac.compare_digest(hash_password(password, salt), stored)
 
 
+def session_epoch() -> str:
+    """Bumped on sign-out, which invalidates every token issued before it."""
+    epoch = get_setting("session_epoch")
+    if epoch is None:
+        epoch = "1"
+        set_setting("session_epoch", epoch)
+    return epoch
+
+
 def make_session() -> str:
-    expires = str(int(time.time()) + SESSION_TTL)
-    sig = hmac.new(session_secret(), expires.encode(), hashlib.sha256).hexdigest()
-    return f"{expires}.{sig}"
+    payload = f"{int(time.time()) + SESSION_TTL}.{session_epoch()}"
+    sig = hmac.new(session_secret(), payload.encode(), hashlib.sha256).hexdigest()
+    return f"{payload}.{sig}"
 
 
 def valid_session(token: str | None) -> bool:
-    if not token or "." not in token:
+    parts = (token or "").split(".")
+    if len(parts) != 3:
         return False
-    expires, sig = token.rsplit(".", 1)
-    expected = hmac.new(session_secret(), expires.encode(), hashlib.sha256).hexdigest()
+    expires, epoch, sig = parts
+    expected = hmac.new(session_secret(), f"{expires}.{epoch}".encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(sig, expected):
+        return False
+    if epoch != session_epoch():
         return False
     try:
         return int(expires) > time.time()
@@ -284,7 +297,7 @@ def page(title: str, body: str) -> HTMLResponse:
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>{html.escape(title)}</title>
-<link rel="stylesheet" href="/style.css?v=4">
+<link rel="stylesheet" href="/style.css?v=5">
 <style>
  body{{padding:40px 0}}
  .inbox{{max-width:860px;margin:0 auto;padding:0 24px}}
@@ -365,6 +378,24 @@ Contact form messages are kept here.</p>
     )
 
 
+def sign_in(response: Response) -> None:
+    """Signed session cookie, plus a plain marker the site can read."""
+    response.set_cookie(
+        SESSION_COOKIE, make_session(), httponly=True, samesite="lax", max_age=SESSION_TTL, path="/"
+    )
+    response.set_cookie(OWNER_MARKER, "1", samesite="lax", max_age=SESSION_TTL, path="/")
+
+
+@app.get("/api/inbox/unread")
+def unread_count(request: Request) -> JSONResponse:
+    """Feeds the owner badge on the public pages. Requires a real session."""
+    if not valid_session(request.cookies.get(SESSION_COOKIE)):
+        return JSONResponse({"signedIn": False, "unread": 0}, status_code=401)
+    with closing(connect()) as conn:
+        (unread,) = conn.execute("SELECT COUNT(*) FROM messages WHERE read = 0").fetchone()
+    return JSONResponse({"signedIn": True, "unread": int(unread)})
+
+
 @app.post("/inbox/setup")
 def inbox_setup(password: str = Form(""), confirm: str = Form("")) -> Response:
     if get_setting("owner_password"):
@@ -373,9 +404,7 @@ def inbox_setup(password: str = Form(""), confirm: str = Form("")) -> Response:
         return RedirectResponse("/inbox", status_code=303)
     set_setting("owner_password", hash_password(password))
     response = RedirectResponse("/inbox", status_code=303)
-    response.set_cookie(
-        SESSION_COOKIE, make_session(), httponly=True, samesite="lax", max_age=SESSION_TTL, path="/"
-    )
+    sign_in(response)
     return response
 
 
@@ -384,16 +413,18 @@ def inbox_login(password: str = Form("")) -> Response:
     stored = get_setting("owner_password")
     response = RedirectResponse("/inbox", status_code=303)
     if stored and verify_password(password, stored):
-        response.set_cookie(
-            SESSION_COOKIE, make_session(), httponly=True, samesite="lax", max_age=SESSION_TTL, path="/"
-        )
+        sign_in(response)
     return response
 
 
 @app.post("/inbox/logout")
 def inbox_logout() -> Response:
+    # Bumping the epoch retires every token already issued, so signing out
+    # is real even if a cookie was copied elsewhere.
+    set_setting("session_epoch", str(int(session_epoch()) + 1))
     response = RedirectResponse("/inbox", status_code=303)
     response.delete_cookie(SESSION_COOKIE, path="/")
+    response.delete_cookie(OWNER_MARKER, path="/")
     return response
 
 

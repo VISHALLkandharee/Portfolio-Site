@@ -18,6 +18,10 @@ plus a working contact form. Homepage + three project case studies + 404.
 ## Architecture
 - `main.py` (FastAPI) + `public/` static files. Healthcheck: /healthz.
 - Contact form POSTs to /api/contact, stored in SQLite at /data/app.db (created on first boot, /data is the only persistent path).
+- Owner inbox at /inbox, reachable from the "Inbox" link in the footer of every page (rel=nofollow, noindex,
+  disallowed in robots.txt). Once signed in, a floating "Inbox (n)" badge appears on the public pages; it is driven by a
+  readable `vk_owner` marker cookie plus GET /api/inbox/unread, which requires a real session, so the marker grants nothing.
+  Signing out bumps a `session_epoch` setting, which retires every token already issued.
 - Owner inbox at /inbox. FIRST VISIT SETS THE PASSWORD, so the owner must claim it right after the first deploy.
   Session is an HMAC-signed cookie; the signing key lives at /data/session.key. Password stored as PBKDF2-SHA256 (200k rounds).
 - Contact form works without JavaScript too: the form posts normally, the server redirects to /thanks.html on success
@@ -34,7 +38,7 @@ plus a working contact form. Homepage + three project case studies + 404.
 - Case study copy is grounded in the resume bullets and repo descriptions. No invented metrics.
 - No em dashes anywhere in visitor-facing copy.
 - Reveal animations only apply when JS is present (`html.js` class), so content is never hidden if a script fails.
-- Cache busting: /style.css?v=4 and /app.js?v=4. BUMP THE VERSION on every CSS/JS change, in every page that links them
+- Cache busting: /style.css?v=5 and /app.js?v=5. BUMP THE VERSION on every CSS/JS change, in every page that links them
   (index, 404, three case studies, and the inline inbox template in main.py).
 
 ## Incident, 2026-08-24: contact form looked unresponsive

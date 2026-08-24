@@ -287,6 +287,29 @@
     });
   }
 
+  /* ---------- owner badge ----------
+     Shows only for a signed-in owner. The marker cookie carries no
+     authority: the unread count is served only against a valid session. */
+  (function () {
+    if (!/(^|;\s*)vk_owner=1/.test(document.cookie)) return;
+    if (window.location.pathname.indexOf('/inbox') === 0) return;
+    fetch('/api/inbox/unread', { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data || !data.signedIn) return;
+        var link = document.createElement('a');
+        link.className = 'owner-badge';
+        link.href = '/inbox';
+        link.innerHTML = '<span class="owner-dot"></span>Inbox' +
+          (data.unread ? ' <b>' + data.unread + '</b>' : '');
+        link.title = data.unread
+          ? data.unread + ' unread message' + (data.unread === 1 ? '' : 's')
+          : 'No unread messages';
+        document.body.appendChild(link);
+      })
+      .catch(function () {});
+  })();
+
   /* ---------- year ---------- */
   var year = document.getElementById('year');
   if (year) year.textContent = new Date().getFullYear();

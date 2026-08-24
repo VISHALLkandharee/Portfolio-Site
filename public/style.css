@@ -349,6 +349,18 @@ section{padding:88px 0;position:relative}
 .foot-bottom a{color:var(--muted);text-decoration:none}
 .foot-bottom a:hover{color:var(--accent)}
 
+/* owner badge, only rendered for a signed-in owner */
+.owner-badge{
+  position:fixed;right:20px;bottom:20px;z-index:90;display:inline-flex;align-items:center;gap:9px;
+  padding:11px 18px;border-radius:100px;text-decoration:none;font-size:.88rem;font-weight:560;
+  background:var(--surface);color:var(--text);border:1px solid color-mix(in srgb,var(--accent) 50%,var(--line));
+  box-shadow:var(--shadow);transition:transform .16s,border-color .16s;
+}
+.owner-badge:hover{transform:translateY(-2px);border-color:var(--accent)}
+.owner-badge b{background:linear-gradient(120deg,var(--accent),var(--accent-2));color:var(--accent-ink);
+  border-radius:100px;padding:1px 9px;font-size:.8rem}
+.owner-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 2.2s infinite}
+
 /* 404 */
 .oops{min-height:62vh;display:grid;place-items:center;text-align:center;padding:80px 0}
 .oops h1{font-size:clamp(4rem,14vw,9rem);letter-spacing:-.05em}
