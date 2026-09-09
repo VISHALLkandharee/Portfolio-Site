@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://portfolio-site-production-014d.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/inbox",
+      "destination": "https://portfolio-site-production-014d.up.railway.app/inbox"
+    },
+    {
+      "source": "/inbox/:path*",
+      "destination": "https://portfolio-site-production-014d.up.railway.app/inbox/:path*"
+    }
+  ]
+}
