@@ -32,6 +32,7 @@ from fastapi.responses import (
     Response,
 )
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -237,6 +238,21 @@ async def lifespan(app: FastAPI):  # noqa: ANN201 - FastAPI lifespan signature
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(GZipMiddleware, minimum_size=800)
+
+# Optional CORS: set the environment variable `CORS_ALLOW_ORIGINS`
+# to a comma-separated list of origins (e.g. https://example.vercel.app)
+# when the frontend is served from a different origin (Vercel) and
+# needs to fetch the API endpoints. Leave unset to keep same-origin only.
+cors_env = os.environ.get("CORS_ALLOW_ORIGINS", "").strip()
+if cors_env:
+    origins = [o.strip() for o in cors_env.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+    )
 
 
 @app.middleware("http")
