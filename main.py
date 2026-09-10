@@ -124,6 +124,13 @@ def init_db() -> None:
                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value"
             )
 
+    reset_password = os.environ.get("INBOX_RESET_PASSWORD", "").strip()
+    if reset_password:
+        if len(reset_password) < 10:
+            raise ValueError("INBOX_RESET_PASSWORD must contain at least 10 characters")
+        set_setting("owner_password", hash_password(reset_password))
+        print("[startup] inbox password reset from INBOX_RESET_PASSWORD; remove that variable now")
+
 
 def session_secret() -> bytes:
     if not SECRET_PATH.exists():
